@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { createStore } from './store.mjs'
 
- test('store persists state atomically', async () => {
+test('store persists state atomically', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mira-forge-'))
   const file = join(dir, 'state.json')
   const store = createStore(file)
@@ -17,5 +17,7 @@ import { createStore } from './store.mjs'
   const state = await store.read()
   assert.equal(state.schemaVersion, 1)
   assert.equal(state.projects[0].id, 'p1')
-  assert.doesNotReject(() => JSON.parse(readFile(file, 'utf8')))
+
+  const raw = await readFile(file, 'utf8')
+  assert.doesNotThrow(() => JSON.parse(raw))
 })
