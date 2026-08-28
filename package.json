@@ -11,7 +11,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "check": "npm test && npm run typecheck && npm run build"
+    "smoke": "node scripts/smoke.mjs",
+    "check": "npm test && npm run typecheck && npm run build && npm run smoke"
   },
   "dependencies": {
     "react": "19.2.0",
