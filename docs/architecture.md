@@ -15,8 +15,14 @@ Managed Projects / Task Cards
    |   Builders Reviewers
    |        |
    +-- Sessions -- Review Handoffs
-             \
-              Dispatch Readiness (read-only)
+   |        \
+   |         Dispatch Attempts -- Runtime Events
+   |                 |
+   |             Process Runner
+   |                 |
+   |          OpenCode local adapter
+   \
+    Dispatch Readiness (read-only)
 ```
 
 The dashboard is a client. A project Vite server is a preview runtime. Neither owns orchestration state.
@@ -51,25 +57,43 @@ Default state file:
 ~/.mira-forge/state.json
 ```
 
-Schema version 1 currently contains additive collections for:
+Schema version 1 contains additive collections for:
 
 - `projects`: registered local project entry points;
 - `batches`: task references and runtime task state;
 - `adapters`: provider-neutral Builder / Reviewer / Git descriptors and heartbeat state;
 - `sessions`: durable Builder / Reviewer execution-session history;
-- `reviews`: SHA-bound review-handoff history.
+- `reviews`: SHA-bound review-handoff history;
+- `dispatches`: durable Builder dispatch attempts and bounded terminal evidence;
+- `events`: append-only runtime milestones used by the control surface.
 
-Older schema-1 files that do not yet contain the additive adapter/session/review arrays remain readable.
+Older schema-1 files that do not contain later additive arrays remain readable.
 
 The server writes through a temporary file and rename, and serializes in-process mutations, so a dashboard refresh, Vite restart or reviewer disconnect does not become the state boundary.
 
-## Adapter and session boundary
+## Adapter, dispatch and session boundary
 
-Adapters describe capabilities and liveness. They do not make the control plane depend on a particular agent implementation.
+Adapters describe capabilities and liveness. Core state does not depend on a particular agent implementation.
 
 Builder and Reviewer sessions bind an adapter to one project/batch/task execution. Session lifecycle is durable and independent from task engineering state. Completing or disconnecting a session does not erase task state or previous sessions.
 
-Forge V1 still does not spawn OpenCode, Codex, Pi Agent or another agent process.
+A dispatch attempt is the durable evidence that Forge explicitly tried to launch a Builder for a ready task. Provider-specific CLI/process behavior lives behind a runner adapter. The first implementation uses local `opencode run --format json --dir <projectRoot>`.
+
+For first use, one Builder adapter supervises only one active dispatch at a time. Parallel Builder execution is deferred until scheduler/worktree contracts exist; this prevents a completed child from falsely marking a still-running shared adapter available and avoids unmanaged working-tree contention.
+
+Forge never treats child-process success as review PASS. Successful construction closes the Builder session and moves the task into the review stage only.
+
+## Process supervision
+
+The local control process owns live child-process handles. Durable state records milestones, but Forge does not pretend those in-memory handles survive a crash.
+
+- normal process exit becomes completed/failed evidence;
+- explicit cancel terminates the child and interrupts the task;
+- normal Forge shutdown interrupts supervised children and clears adapter liveness;
+- startup reconciliation marks leftover starting/running attempts interrupted and their sessions disconnected;
+- late terminal callbacks cannot overwrite an already terminal dispatch.
+
+The OpenCode adapter parses JSONL defensively and captures the first observed external `sessionID`, while child-process exit remains the authoritative completion signal.
 
 ## Review handoff invariant
 
@@ -94,6 +118,7 @@ For the current milestone:
 - a task with an active Builder session is blocked;
 - missing, self and cyclic dependency references are invalid;
 - multiple independent tasks may be reported ready together;
+- the execution layer may still apply the stricter first-use single-active-Builder policy;
 - parallel construction still does not imply parallel integration.
 
 Policy overrides for dependency satisfaction are intentionally deferred.
@@ -107,11 +132,15 @@ Policy overrides for dependency satisfaction are intentionally deferred.
 - `GET|POST /api/batches`
 - `PATCH /api/batches/:batchId/tasks/:taskId`
 - `GET /api/batches/:batchId/dispatch-ready`
+- `POST /api/batches/:batchId/tasks/:taskId/dispatch`
 - `GET|POST /api/adapters`
 - `POST /api/adapters/:adapterId/heartbeat`
 - `GET|POST /api/sessions`
 - `PATCH /api/sessions/:sessionId`
 - `GET|POST /api/reviews`
 - `POST /api/reviews/:reviewId/result`
+- `GET /api/dispatches`
+- `POST /api/dispatches/:dispatchId/cancel`
+- `GET /api/events`
 
-Actual Builder/Reviewer process launching and Git integration remain later adapter milestones.
+Automatic Reviewer dispatch, Git integration, worktree scheduling and parallel integration remain later milestones.

@@ -1,6 +1,6 @@
 # T009 — Dispatch request and durable attempt
 
-Status: DOING
+Status: PASS
 
 ## Goal
 
@@ -9,12 +9,13 @@ Turn a read-only ready task into one explicit, durable Builder dispatch attempt 
 ## Acceptance
 
 - Add durable `dispatches` and runtime `events` state with schema-1 backward compatibility.
-- A dispatch request must be accepted only when the task is currently reported ready by the existing readiness contract.
-- Dispatch creation must bind project, batch, task, Builder adapter and Builder session in one serialized state mutation.
-- A second dispatch for the same task must not race past the active-session gate.
-- Store dispatch metadata and execution evidence, but do not persist the full inline prompt.
+- A dispatch request is accepted only when the task is currently reported ready by the existing readiness contract.
+- Dispatch creation binds project, batch, task, Builder adapter and Builder session in one serialized state mutation.
+- Duplicate dispatch for the same task is blocked by active-session readiness.
+- The first-use policy allows only one active dispatch per Builder adapter, preventing false liveness and working-tree contention before scheduler/worktree support.
+- Store dispatch metadata and bounded execution evidence, but do not persist the full inline prompt.
 - Expose runtime state through small explicit APIs.
-- A dispatch request must not auto-merge, push, deploy, or broaden Builder permissions.
+- A dispatch request does not auto-merge, push, deploy, or broaden Builder permissions.
 
 ## Dependencies
 
@@ -24,11 +25,10 @@ Turn a read-only ready task into one explicit, durable Builder dispatch attempt 
 
 ## Out of scope
 
-- Spawning OpenCode or another process; that belongs to T010.
 - Automatic Reviewer handoff.
-- Parallel scheduling policy.
+- Parallel scheduling policy/worktrees.
 - TUI controls.
 
-## Validation
+## Evidence
 
-Domain/store tests plus HTTP smoke must prove durable creation, active-session race protection, additive legacy-state compatibility, and runtime-event visibility.
+Implemented in `server/dispatch-domain.mjs` and `server/dispatch-manager.mjs`. Store compatibility covers additive `dispatches`/`events`. Manager tests cover durable creation, same-task duplicate protection and cross-task single-adapter serialization. HTTP dispatch smoke exercises durable dispatch creation and runtime-event visibility. GitHub Actions Verify #51 passed `test + typecheck + build + smoke` on `905f6c5767df`.
