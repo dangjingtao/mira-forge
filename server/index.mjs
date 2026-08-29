@@ -76,9 +76,9 @@ async function serveStatic(requestPath, response) {
 }
 
 const server = createServer(async (request, response) => {
-  const url = new URL(request.url || '/', `http://${request.headers.host || `${host}:${port}`}`)
-
   try {
+    const url = new URL(request.url || '/', `http://${host}:${port}`)
+
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return sendJson(response, 200, { ok: true, service: 'mira-forge', version: '0.1.0', stateFile })
     }
