@@ -60,7 +60,6 @@ export function createOpenCodeAcceptance({ runner, baseDir = tmpdir(), timeoutMs
             handle?.kill?.('SIGTERM')
             finish({ kind: 'timeout', error: `OpenCode did not finish within ${timeoutMs}ms` })
           }, timeoutMs)
-          timer.unref?.()
 
           try {
             handle = runner.start({
