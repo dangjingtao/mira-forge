@@ -1,6 +1,6 @@
 # T001 — Bootstrap local control service
 
-Status: REVIEW
+Status: PASS
 
 ## Goal
 
@@ -15,4 +15,4 @@ Create one global local HTTP service that stays independent from managed-project
 
 ## Evidence
 
-Implemented in `server/index.mjs`. Repository verification is still required before PASS.
+Implemented in `server/index.mjs`. Verify #18 passed `test + typecheck + build + smoke`; smoke covers health/state, built-dashboard serving, and survival after a malformed Host request.

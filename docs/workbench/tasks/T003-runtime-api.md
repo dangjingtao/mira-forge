@@ -1,6 +1,6 @@
 # T003 — Project registry and runtime API
 
-Status: REVIEW
+Status: PASS
 
 ## Goal
 
@@ -16,4 +16,4 @@ Provide the minimum machine contract needed before Builder and Reviewer adapters
 
 ## Evidence
 
-Implemented in `server/domain.mjs` and `server/index.mjs` with domain tests. Repository verification is still required before PASS.
+Implemented in `server/domain.mjs` and `server/index.mjs` with domain tests. Review follow-up added guards requiring `reviewedSha === currentSha` for `review_passed` and enforcing unique Batch IDs. Verify #18 passed `test + typecheck + build + smoke`.

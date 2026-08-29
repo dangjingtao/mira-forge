@@ -1,6 +1,6 @@
 # T002 — Durable runtime ledger
 
-Status: REVIEW
+Status: PASS
 
 ## Goal
 
@@ -15,4 +15,4 @@ Persist Forge runtime facts outside managed repositories so review/client discon
 
 ## Evidence
 
-Implemented in `server/store.mjs` with `node:test` coverage. Repository verification is still required before PASS.
+Implemented in `server/store.mjs` with `node:test` coverage. Verify #18 passed `test + typecheck + build + smoke` on the current `dev` baseline.

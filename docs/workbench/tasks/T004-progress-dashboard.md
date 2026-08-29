@@ -1,6 +1,6 @@
 # T004 — Minimal global progress dashboard
 
-Status: REVIEW
+Status: PASS
 
 ## Goal
 
@@ -16,4 +16,4 @@ Make multiple local AI construction jobs visible in one place without creating a
 
 ## Evidence
 
-Implemented in `src/App.tsx` and `src/styles.css`. Repository verification is still required before PASS.
+Implemented in `src/App.tsx` and `src/styles.css`. Verify #18 passed `test + typecheck + build + smoke`. Manual browser black-box on 2026-08-29 confirmed project registration succeeds and remains present after a full page refresh.
