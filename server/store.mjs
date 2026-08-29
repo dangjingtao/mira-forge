@@ -2,23 +2,23 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 export function createEmptyState() {
-  return { schemaVersion: 1, projects: [], batches: [], adapters: [], sessions: [] }
+  return { schemaVersion: 1, projects: [], batches: [], adapters: [], sessions: [], reviews: [] }
 }
 
 function normalizeState(parsed) {
   if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.projects) || !Array.isArray(parsed.batches)) {
     throw new Error('Unsupported or invalid Mira Forge state file')
   }
-  if (parsed.adapters !== undefined && !Array.isArray(parsed.adapters)) {
-    throw new Error('Unsupported or invalid Mira Forge state file')
-  }
-  if (parsed.sessions !== undefined && !Array.isArray(parsed.sessions)) {
-    throw new Error('Unsupported or invalid Mira Forge state file')
+  for (const field of ['adapters', 'sessions', 'reviews']) {
+    if (parsed[field] !== undefined && !Array.isArray(parsed[field])) {
+      throw new Error('Unsupported or invalid Mira Forge state file')
+    }
   }
   return {
     ...parsed,
     adapters: parsed.adapters ?? [],
     sessions: parsed.sessions ?? [],
+    reviews: parsed.reviews ?? [],
   }
 }
 

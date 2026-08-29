@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createBatch,
+  createReviewHandoff,
   createSession,
   heartbeatAdapter,
   registerAdapter,
   registerProject,
+  resolveReviewHandoff,
   updateSession,
   updateTask,
 } from './domain.mjs'
@@ -21,9 +23,6 @@ test('project, batch and task runtime state form the minimal pipeline', () => {
 
   updateTask(state, batch.id, 'T001', { status: 'reviewing', reviewRound: 1, currentSha: 'abc' })
   assert.equal(batch.status, 'reviewing')
-
-  updateTask(state, batch.id, 'T001', { status: 'review_passed', reviewedSha: 'abc' })
-  assert.equal(batch.status, 'waiting_integration')
 })
 
 test('invalid runtime status is rejected', () => {
@@ -33,25 +32,19 @@ test('invalid runtime status is rejected', () => {
   assert.throws(() => updateTask(state, batch.id, 'T001', { status: 'done-ish' }), /invalid task status/)
 })
 
-test('review_passed requires reviewed SHA bound to current SHA', () => {
+test('task patches cannot forge review pass evidence', () => {
   const state = createEmptyState()
   const project = registerProject(state, { name: 'Demo', rootPath: '/tmp/demo' })
   const batch = createBatch(state, { projectId: project.id, tasks: [{ id: 'T001' }] })
+  updateTask(state, batch.id, 'T001', { currentSha: 'abc' })
 
-  updateTask(state, batch.id, 'T001', { status: 'reviewing', currentSha: 'abc' })
   assert.throws(
     () => updateTask(state, batch.id, 'T001', { status: 'review_passed' }),
-    /reviewedSha is required/,
+    /review_passed is managed by review handoff/,
   )
   assert.throws(
-    () => updateTask(state, batch.id, 'T001', { status: 'review_passed', reviewedSha: 'def' }),
-    /reviewedSha must match currentSha/,
-  )
-
-  updateTask(state, batch.id, 'T001', { status: 'review_passed', reviewedSha: 'abc' })
-  assert.throws(
-    () => updateTask(state, batch.id, 'T001', { currentSha: 'def' }),
-    /reviewedSha must match currentSha/,
+    () => updateTask(state, batch.id, 'T001', { reviewedSha: 'abc' }),
+    /reviewedSha is managed by review handoff/,
   )
 })
 
@@ -173,4 +166,101 @@ test('session lifecycle rejects incompatible adapters, duplicate active roles an
   updateSession(state, session.id, { status: 'running' })
   updateSession(state, session.id, { status: 'failed' })
   assert.throws(() => updateSession(state, session.id, { status: 'running' }), /invalid session transition/)
+})
+
+function reviewFixture() {
+  const state = createEmptyState()
+  const project = registerProject(state, { name: 'Review Demo', rootPath: '/tmp/review-demo' })
+  const batch = createBatch(state, { projectId: project.id, tasks: [{ id: 'T001' }] })
+  const reviewer = registerAdapter(state, { id: 'reviewer-local', name: 'Reviewer', kind: 'reviewer' })
+  const reviewerSession = createSession(state, {
+    id: 'S-reviewer-1',
+    role: 'reviewer',
+    adapterId: reviewer.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  })
+  updateSession(state, reviewerSession.id, { status: 'running' })
+  updateTask(state, batch.id, 'T001', { currentSha: 'abc' })
+  return { state, project, batch, reviewerSession }
+}
+
+test('valid review handoff binds a reviewer session and exact task SHA', () => {
+  const { state, project, batch, reviewerSession } = reviewFixture()
+  const review = createReviewHandoff(state, {
+    id: 'R-1',
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+    reviewerSessionId: reviewerSession.id,
+    sha: 'abc',
+  })
+
+  assert.equal(review.status, 'requested')
+  assert.equal(review.round, 1)
+  assert.equal(batch.tasks[0].status, 'reviewing')
+  assert.equal(batch.tasks[0].reviewerSessionId, reviewerSession.id)
+
+  const result = resolveReviewHandoff(state, review.id, { result: 'passed', reviewedSha: 'abc' })
+  assert.equal(result.status, 'passed')
+  assert.equal(result.actionable, true)
+  assert.equal(batch.tasks[0].status, 'review_passed')
+  assert.equal(batch.tasks[0].reviewedSha, 'abc')
+})
+
+test('review result rejects a SHA different from the requested SHA', () => {
+  const { state, project, batch, reviewerSession } = reviewFixture()
+  const review = createReviewHandoff(state, {
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+    reviewerSessionId: reviewerSession.id,
+    sha: 'abc',
+  })
+
+  assert.throws(
+    () => resolveReviewHandoff(state, review.id, { result: 'passed', reviewedSha: 'def' }),
+    /reviewedSha must match review requestedSha/,
+  )
+})
+
+test('changing current SHA invalidates an earlier pass while preserving review history', () => {
+  const { state, project, batch, reviewerSession } = reviewFixture()
+  const review = createReviewHandoff(state, {
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+    reviewerSessionId: reviewerSession.id,
+    sha: 'abc',
+  })
+  resolveReviewHandoff(state, review.id, { result: 'passed', reviewedSha: 'abc' })
+
+  updateTask(state, batch.id, 'T001', { currentSha: 'def' })
+
+  assert.equal(batch.tasks[0].status, 'stale')
+  assert.equal(batch.tasks[0].reviewedSha, null)
+  assert.equal(state.reviews.length, 1)
+  assert.equal(review.status, 'passed')
+  assert.equal(review.actionable, false)
+  assert.ok(review.invalidatedAt)
+})
+
+test('a review resolved after task SHA changed is recorded but non-actionable', () => {
+  const { state, project, batch, reviewerSession } = reviewFixture()
+  const review = createReviewHandoff(state, {
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+    reviewerSessionId: reviewerSession.id,
+    sha: 'abc',
+  })
+
+  updateTask(state, batch.id, 'T001', { currentSha: 'def' })
+  resolveReviewHandoff(state, review.id, { result: 'passed', reviewedSha: 'abc' })
+
+  assert.equal(review.status, 'passed')
+  assert.equal(review.actionable, false)
+  assert.notEqual(batch.tasks[0].status, 'review_passed')
+  assert.equal(batch.tasks[0].reviewedSha, null)
 })

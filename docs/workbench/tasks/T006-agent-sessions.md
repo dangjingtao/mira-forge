@@ -1,6 +1,6 @@
 # T006 — Agent session lifecycle
 
-Status: DOING
+Status: PASS
 
 ## Goal
 
@@ -26,6 +26,6 @@ Represent Builder and Reviewer execution sessions as durable runtime facts that 
 - Injecting prompts/context into an agent.
 - Terminal multiplexing.
 
-## Validation
+## Evidence
 
-Domain transition tests + legacy persistence compatibility + API smoke + repository Verify.
+Implemented in `server/domain.mjs`, `server/store.mjs` and `server/index.mjs`; transition tests and HTTP smoke cover compatible role binding, duplicate-active-session rejection, history retention and terminal lifecycle. GitHub Actions Verify #26 passed `test + typecheck + build + smoke` on commit `cd07e92ec9c9`.

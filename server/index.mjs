@@ -8,10 +8,13 @@ import {
   ADAPTER_KINDS,
   ADAPTER_STATUSES,
   createBatch,
+  createReviewHandoff,
   createSession,
   heartbeatAdapter,
   registerAdapter,
   registerProject,
+  resolveReviewHandoff,
+  REVIEW_STATUSES,
   SESSION_ROLES,
   SESSION_STATUSES,
   TASK_STATUSES,
@@ -110,6 +113,9 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/api/sessions') {
       return sendJson(response, 200, (await store.read()).sessions)
     }
+    if (request.method === 'GET' && url.pathname === '/api/reviews') {
+      return sendJson(response, 200, (await store.read()).reviews)
+    }
     if (request.method === 'GET' && url.pathname === '/api/meta') {
       return sendJson(response, 200, {
         taskStatuses: TASK_STATUSES,
@@ -117,6 +123,7 @@ const server = createServer(async (request, response) => {
         adapterStatuses: ADAPTER_STATUSES,
         sessionRoles: SESSION_ROLES,
         sessionStatuses: SESSION_STATUSES,
+        reviewStatuses: REVIEW_STATUSES,
       })
     }
     if (request.method === 'POST' && url.pathname === '/api/projects') {
@@ -139,6 +146,11 @@ const server = createServer(async (request, response) => {
       const session = await store.mutate((state) => createSession(state, body))
       return sendJson(response, 201, session)
     }
+    if (request.method === 'POST' && url.pathname === '/api/reviews') {
+      const body = await readJson(request)
+      const review = await store.mutate((state) => createReviewHandoff(state, body))
+      return sendJson(response, 201, review)
+    }
 
     const heartbeatMatch = url.pathname.match(/^\/api\/adapters\/([^/]+)\/heartbeat$/)
     if (request.method === 'POST' && heartbeatMatch) {
@@ -154,6 +166,14 @@ const server = createServer(async (request, response) => {
       const body = await readJson(request)
       const session = await store.mutate((state) => updateSession(state, decodeURIComponent(rawSessionId), body))
       return sendJson(response, 200, session)
+    }
+
+    const reviewResultMatch = url.pathname.match(/^\/api\/reviews\/([^/]+)\/result$/)
+    if (request.method === 'POST' && reviewResultMatch) {
+      const [, rawReviewId] = reviewResultMatch
+      const body = await readJson(request)
+      const review = await store.mutate((state) => resolveReviewHandoff(state, decodeURIComponent(rawReviewId), body))
+      return sendJson(response, 200, review)
     }
 
     const taskMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/tasks\/([^/]+)$/)

@@ -16,9 +16,11 @@ export const ADAPTER_KINDS = ['builder', 'reviewer', 'git']
 export const ADAPTER_STATUSES = ['available', 'busy', 'offline', 'error']
 export const SESSION_ROLES = ['builder', 'reviewer']
 export const SESSION_STATUSES = ['starting', 'running', 'waiting', 'completed', 'failed', 'disconnected']
+export const REVIEW_STATUSES = ['requested', 'passed', 'changes_requested', 'failed', 'cancelled']
 
 const ACTIVE_SESSION_STATUSES = ['starting', 'running', 'waiting']
 const TERMINAL_SESSION_STATUSES = ['completed', 'failed', 'disconnected']
+const REVIEW_RESULTS = ['passed', 'changes_requested', 'failed', 'cancelled']
 const SESSION_TRANSITIONS = {
   starting: ['running', 'completed', 'failed', 'disconnected'],
   running: ['waiting', 'completed', 'failed', 'disconnected'],
@@ -54,33 +56,22 @@ function sessions(state) {
   return state.sessions
 }
 
-function nextAdapterId(state, inputId) {
-  const current = adapters(state)
-  const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
-  if (explicitId) {
-    if (current.some((adapter) => adapter.id === explicitId)) throw new Error(`duplicate adapter id: ${explicitId}`)
-    return explicitId
-  }
-
-  let id
-  do {
-    id = randomUUID()
-  } while (current.some((adapter) => adapter.id === id))
-  return id
+function reviews(state) {
+  if (!Array.isArray(state.reviews)) state.reviews = []
+  return state.reviews
 }
 
-function nextSessionId(state, inputId) {
-  const current = sessions(state)
+function nextUniqueId(items, inputId, prefix, name) {
   const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
   if (explicitId) {
-    if (current.some((session) => session.id === explicitId)) throw new Error(`duplicate session id: ${explicitId}`)
+    if (items.some((item) => item.id === explicitId)) throw new Error(`duplicate ${name} id: ${explicitId}`)
     return explicitId
   }
 
   let id
   do {
-    id = `S-${randomUUID().slice(0, 12)}`
-  } while (current.some((session) => session.id === id))
+    id = prefix ? `${prefix}-${randomUUID().slice(0, 12)}` : randomUUID()
+  } while (items.some((item) => item.id === id))
   return id
 }
 
@@ -108,6 +99,15 @@ function resolveTaskBinding(state, projectId, batchId, taskId) {
   return { project, batch, task }
 }
 
+function deriveBatchStatus(tasks) {
+  if (tasks.every((task) => task.status === 'integrated')) return 'integrated'
+  if (tasks.some((task) => task.status === 'interrupted' || task.status === 'stale')) return 'attention'
+  if (tasks.some((task) => task.status === 'building' || task.status === 'fixing')) return 'active'
+  if (tasks.some((task) => task.status === 'reviewing')) return 'reviewing'
+  if (tasks.every((task) => ['review_passed', 'waiting_integration', 'integrated'].includes(task.status))) return 'waiting_integration'
+  return 'planned'
+}
+
 export function registerAdapter(state, input) {
   const kind = requiredString(input.kind, 'kind')
   if (!ADAPTER_KINDS.includes(kind)) throw new Error(`invalid adapter kind: ${kind}`)
@@ -117,7 +117,7 @@ export function registerAdapter(state, input) {
 
   const timestamp = now()
   const adapter = {
-    id: nextAdapterId(state, input.id),
+    id: nextUniqueId(adapters(state), input.id, '', 'adapter'),
     name: requiredString(input.name, 'name'),
     kind,
     capabilities: stringList(input.capabilities, 'capabilities'),
@@ -168,7 +168,7 @@ export function createSession(state, input) {
 
   const timestamp = now()
   const session = {
-    id: nextSessionId(state, input.id),
+    id: nextUniqueId(sessions(state), input.id, 'S', 'session'),
     role,
     adapterId,
     projectId,
@@ -213,6 +213,97 @@ export function updateSession(state, sessionId, patch) {
 
   session.updatedAt = timestamp
   return session
+}
+
+export function createReviewHandoff(state, input) {
+  const projectId = requiredString(input.projectId, 'projectId')
+  const batchId = requiredString(input.batchId, 'batchId')
+  const taskId = requiredString(input.taskId, 'taskId')
+  const requestedSha = requiredString(input.sha, 'sha')
+  const reviewerSessionId = requiredString(input.reviewerSessionId, 'reviewerSessionId')
+  const { batch, task } = resolveTaskBinding(state, projectId, batchId, taskId)
+
+  if (!task.currentSha) throw new Error('task currentSha is required before review handoff')
+  if (task.currentSha !== requestedSha) throw new Error('review sha must match task currentSha')
+
+  const reviewerSession = sessions(state).find((session) => session.id === reviewerSessionId)
+  if (!reviewerSession) throw new Error('reviewerSessionId not found')
+  if (reviewerSession.role !== 'reviewer') throw new Error('review handoff requires a reviewer session')
+  if (reviewerSession.projectId !== projectId || reviewerSession.batchId !== batchId || reviewerSession.taskId !== taskId) {
+    throw new Error('reviewer session is bound to a different task')
+  }
+  if (!ACTIVE_SESSION_STATUSES.includes(reviewerSession.status)) throw new Error('reviewer session is not active')
+
+  const pending = reviews(state).find((review) =>
+    review.projectId === projectId
+    && review.batchId === batchId
+    && review.taskId === taskId
+    && review.status === 'requested')
+  if (pending) throw new Error('pending review handoff already exists for task')
+
+  const timestamp = now()
+  const round = (Number.isInteger(task.reviewRound) ? task.reviewRound : 0) + 1
+  const review = {
+    id: nextUniqueId(reviews(state), input.id, 'R', 'review'),
+    projectId,
+    batchId,
+    taskId,
+    reviewerSessionId,
+    round,
+    requestedSha,
+    reviewedSha: null,
+    status: 'requested',
+    actionable: null,
+    invalidatedAt: null,
+    resolvedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  reviews(state).push(review)
+
+  task.reviewRound = round
+  task.reviewerSessionId = reviewerSessionId
+  task.status = 'reviewing'
+  task.updatedAt = timestamp
+  batch.updatedAt = timestamp
+  batch.status = deriveBatchStatus(batch.tasks)
+  return review
+}
+
+export function resolveReviewHandoff(state, reviewId, input) {
+  const review = reviews(state).find((item) => item.id === reviewId)
+  if (!review) throw new Error('review not found')
+  if (review.status !== 'requested') throw new Error('review handoff is already resolved')
+
+  const result = requiredString(input.result, 'result')
+  if (!REVIEW_RESULTS.includes(result)) throw new Error(`invalid review result: ${result}`)
+  const { batch, task } = resolveTaskBinding(state, review.projectId, review.batchId, review.taskId)
+
+  let reviewedSha = null
+  if (result !== 'cancelled') {
+    reviewedSha = requiredString(input.reviewedSha, 'reviewedSha')
+    if (reviewedSha !== review.requestedSha) throw new Error('reviewedSha must match review requestedSha')
+  }
+
+  const timestamp = now()
+  const actionable = result !== 'cancelled' && task.currentSha === review.requestedSha
+  review.status = result
+  review.reviewedSha = reviewedSha
+  review.actionable = actionable
+  review.resolvedAt = timestamp
+  review.updatedAt = timestamp
+
+  if (actionable && result === 'passed') {
+    task.reviewedSha = reviewedSha
+    task.status = 'review_passed'
+  } else if (actionable && result === 'changes_requested') {
+    task.reviewedSha = null
+    task.status = 'fixing'
+  }
+  task.updatedAt = timestamp
+  batch.updatedAt = timestamp
+  batch.status = deriveBatchStatus(batch.tasks)
+  return review
 }
 
 export function registerProject(state, input) {
@@ -280,38 +371,43 @@ export function createBatch(state, input) {
   return batch
 }
 
-function deriveBatchStatus(tasks) {
-  if (tasks.every((task) => task.status === 'integrated')) return 'integrated'
-  if (tasks.some((task) => task.status === 'interrupted' || task.status === 'stale')) return 'attention'
-  if (tasks.some((task) => task.status === 'building' || task.status === 'fixing')) return 'active'
-  if (tasks.some((task) => task.status === 'reviewing')) return 'reviewing'
-  if (tasks.every((task) => ['review_passed', 'waiting_integration', 'integrated'].includes(task.status))) return 'waiting_integration'
-  return 'planned'
-}
-
 export function updateTask(state, batchId, taskId, patch) {
   const batch = state.batches.find((item) => item.id === batchId)
   if (!batch) throw new Error('batch not found')
   const task = batch.tasks.find((item) => item.id === taskId)
   if (!task) throw new Error('task not found')
 
-  const nextStatus = patch.status !== undefined ? patch.status : task.status
+  if (patch.status === 'review_passed') throw new Error('review_passed is managed by review handoff')
+  if (patch.reviewedSha !== undefined) throw new Error('reviewedSha is managed by review handoff')
+
+  const currentShaChanged = patch.currentSha !== undefined && (patch.currentSha || null) !== task.currentSha
+  let nextStatus = patch.status !== undefined ? patch.status : task.status
+  let nextReviewedSha = task.reviewedSha
+  if (currentShaChanged && task.reviewedSha && task.reviewedSha !== (patch.currentSha || null)) {
+    nextReviewedSha = null
+    if (patch.status === undefined && task.status === 'review_passed') nextStatus = 'stale'
+  }
   if (!TASK_STATUSES.includes(nextStatus)) throw new Error(`invalid task status: ${nextStatus}`)
 
-  const nextCurrentSha = patch.currentSha !== undefined ? patch.currentSha || null : task.currentSha
-  const nextReviewedSha = patch.reviewedSha !== undefined ? patch.reviewedSha || null : task.reviewedSha
-  if (nextStatus === 'review_passed') {
-    if (!nextReviewedSha) throw new Error('reviewedSha is required for review_passed')
-    if (!nextCurrentSha) throw new Error('currentSha is required for review_passed')
-    if (nextReviewedSha !== nextCurrentSha) throw new Error('reviewedSha must match currentSha for review_passed')
-  }
-
+  const timestamp = now()
   task.status = nextStatus
 
-  const scalarFields = ['builder', 'builderSessionId', 'reviewerSessionId', 'worktree', 'baseSha', 'currentSha', 'reviewedSha']
+  const scalarFields = ['builder', 'builderSessionId', 'reviewerSessionId', 'worktree', 'baseSha', 'currentSha']
   for (const field of scalarFields) {
     if (patch[field] !== undefined) task[field] = patch[field] || null
   }
+  task.reviewedSha = nextReviewedSha
+
+  if (currentShaChanged) {
+    for (const review of reviews(state)) {
+      if (review.batchId === batchId && review.taskId === taskId && review.status === 'passed' && review.actionable === true && review.requestedSha !== task.currentSha) {
+        review.actionable = false
+        review.invalidatedAt = timestamp
+        review.updatedAt = timestamp
+      }
+    }
+  }
+
   if (patch.reviewRound !== undefined) {
     if (!Number.isInteger(patch.reviewRound) || patch.reviewRound < 0) throw new Error('reviewRound must be a non-negative integer')
     task.reviewRound = patch.reviewRound
@@ -321,7 +417,6 @@ export function updateTask(state, batchId, taskId, patch) {
     task.previewUrls = patch.previewUrls
   }
 
-  const timestamp = now()
   task.updatedAt = timestamp
   batch.updatedAt = timestamp
   batch.status = deriveBatchStatus(batch.tasks)

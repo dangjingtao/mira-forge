@@ -19,6 +19,7 @@ test('store persists state atomically', async () => {
   assert.equal(state.projects[0].id, 'p1')
   assert.deepEqual(state.adapters, [])
   assert.deepEqual(state.sessions, [])
+  assert.deepEqual(state.reviews, [])
 
   const raw = await readFile(file, 'utf8')
   assert.doesNotThrow(() => JSON.parse(raw))
@@ -32,4 +33,5 @@ test('schema-1 state without additive runtime arrays remains readable', async ()
   const state = await createStore(file).read()
   assert.deepEqual(state.adapters, [])
   assert.deepEqual(state.sessions, [])
+  assert.deepEqual(state.reviews, [])
 })
