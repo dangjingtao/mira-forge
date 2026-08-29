@@ -21,6 +21,7 @@ export const REVIEW_STATUSES = ['requested', 'passed', 'changes_requested', 'fai
 const ACTIVE_SESSION_STATUSES = ['starting', 'running', 'waiting']
 const TERMINAL_SESSION_STATUSES = ['completed', 'failed', 'disconnected']
 const REVIEW_RESULTS = ['passed', 'changes_requested', 'failed', 'cancelled']
+const REVIEW_DERIVED_TASK_STATUSES = ['review_passed', 'waiting_integration', 'integrated']
 const SESSION_TRANSITIONS = {
   starting: ['running', 'completed', 'failed', 'disconnected'],
   running: ['waiting', 'completed', 'failed', 'disconnected'],
@@ -201,7 +202,9 @@ export function updateSession(state, sessionId, patch) {
       throw new Error(`invalid session transition: ${session.status} -> ${nextStatus}`)
     }
     if (session.status !== 'running' && nextStatus === 'running' && !session.startedAt) session.startedAt = timestamp
-    if (TERMINAL_SESSION_STATUSES.includes(nextStatus)) session.endedAt = timestamp
+    if (!TERMINAL_SESSION_STATUSES.includes(session.status) && TERMINAL_SESSION_STATUSES.includes(nextStatus)) {
+      session.endedAt = timestamp
+    }
     session.status = nextStatus
   }
 
@@ -352,7 +355,7 @@ export function createBatch(state, input) {
       currentSha: null,
       reviewedSha: null,
       reviewRound: 0,
-      dependsOn: Array.isArray(task.dependsOn) ? task.dependsOn.filter(Boolean) : [],
+      dependsOn: stringList(task.dependsOn, 'task.dependsOn'),
       previewUrls: {},
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -388,7 +391,8 @@ export function updateTask(state, batchId, taskId, patch) {
   let nextReviewedSha = task.reviewedSha
   if (currentShaChanged && task.reviewedSha && task.reviewedSha !== (patch.currentSha || null)) {
     nextReviewedSha = null
-    if (patch.status === undefined && task.status === 'review_passed') nextStatus = 'stale'
+    const requestedReviewDerivedState = REVIEW_DERIVED_TASK_STATUSES.includes(nextStatus)
+    if (patch.status === undefined || requestedReviewDerivedState) nextStatus = 'stale'
   }
   if (!TASK_STATUSES.includes(nextStatus)) throw new Error(`invalid task status: ${nextStatus}`)
 
