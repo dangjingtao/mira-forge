@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { homedir } from 'node:os'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createOpenCodeAcceptance } from './acceptance.mjs'
 import {
   ADAPTER_KINDS,
   ADAPTER_STATUSES,
@@ -41,6 +42,10 @@ const openCodeRunner = createOpenCodeRunner({
 const dispatchManager = createDispatchManager({
   store,
   runners: new Map([[OPENCODE_ADAPTER_ID, openCodeRunner]]),
+})
+const openCodeAcceptance = createOpenCodeAcceptance({
+  runner: openCodeRunner,
+  timeoutMs: Number(process.env.MIRA_FORGE_ACCEPTANCE_TIMEOUT_MS || 120_000),
 })
 
 function sendJson(response, status, payload) {
@@ -150,7 +155,11 @@ const server = createServer(async (request, response) => {
         dispatchStatuses: DISPATCH_STATUSES,
         dispatchableTaskStatuses: DISPATCHABLE_TASK_STATUSES,
         builtinBuilderAdapters: [OPENCODE_ADAPTER_ID],
+        firstRunChecks: ['opencode'],
       })
+    }
+    if (request.method === 'POST' && url.pathname === '/api/acceptance/opencode') {
+      return sendJson(response, 200, await openCodeAcceptance.run())
     }
     if (request.method === 'POST' && url.pathname === '/api/projects') {
       const body = await readJson(request)

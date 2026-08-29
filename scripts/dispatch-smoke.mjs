@@ -54,6 +54,7 @@ const child = spawn(process.execPath, ['server/index.mjs'], {
     MIRA_FORGE_OPENCODE_BIN: process.execPath,
     MIRA_FORGE_OPENCODE_PREFIX_ARGS: JSON.stringify([fakeOpenCode]),
     MIRA_FORGE_FAKE_OPENCODE_DELAY_MS: '200',
+    MIRA_FORGE_ACCEPTANCE_TIMEOUT_MS: '5000',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
@@ -77,6 +78,12 @@ try {
     await sleep(100)
   }
   if (!healthy) throw new Error(`Forge dispatch smoke did not become healthy.\n${logs}`)
+
+  const acceptance = await json(await fetch(`${baseUrl}/api/acceptance/opencode`, { method: 'POST' }))
+  if (!acceptance.ok || acceptance.status !== 'passed') throw new Error(`First-run check did not pass: ${JSON.stringify(acceptance)}`)
+  if (!acceptance.externalSessionId || !acceptance.markerVerified || acceptance.workspaceDisposable !== true) {
+    throw new Error(`First-run check evidence is incomplete: ${JSON.stringify(acceptance)}`)
+  }
 
   const project = await json(await fetch(`${baseUrl}/api/projects`, {
     method: 'POST',
@@ -144,6 +151,7 @@ try {
   if (!meta.dispatchStatuses.includes('completed') || !meta.builtinBuilderAdapters.includes('opencode-local')) {
     throw new Error('Dispatch metadata is incomplete')
   }
+  if (!meta.firstRunChecks.includes('opencode')) throw new Error('First-run check metadata is incomplete')
 
   console.log(`Dispatch smoke OK: ${baseUrl}`)
 } finally {

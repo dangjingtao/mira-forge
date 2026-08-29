@@ -1,3 +1,6 @@
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
 const args = process.argv.slice(2)
 
 if (args.includes('--dangerously-skip-permissions')) {
@@ -11,6 +14,8 @@ if (dirIndex < 0 || !args[dirIndex + 1]) {
   process.exit(92)
 }
 
+const projectRoot = args[dirIndex + 1]
+const prompt = args.at(-1) || ''
 const delayMs = Number(process.env.MIRA_FORGE_FAKE_OPENCODE_DELAY_MS || 0)
 const exitCode = Number(process.env.MIRA_FORGE_FAKE_OPENCODE_EXIT || 0)
 const sessionID = process.env.MIRA_FORGE_FAKE_OPENCODE_SESSION || 'ses_fake_dispatch'
@@ -22,6 +27,10 @@ console.log(JSON.stringify({
   sessionID,
   part: { type: 'text', text: 'fake builder completed' },
 }))
+
+if (prompt.includes('MIRA_FORGE_ACCEPTANCE_OK')) {
+  await writeFile(join(projectRoot, 'mira-forge-acceptance.txt'), 'MIRA_FORGE_ACCEPTANCE_OK\n')
+}
 
 if (delayMs > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delayMs))
 
