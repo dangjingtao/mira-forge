@@ -10,5 +10,9 @@
 | T006 | Agent session lifecycle | PASS | Durable role-bound session lifecycle + transition/API smoke; Verify #26 |
 | T007 | SHA-bound review handoff history | PASS | Durable review history + round/SHA anti-forgery + invalidation; Verify #31 |
 | T008 | Dispatch readiness and dependency gate | PASS | Dependency validation + active-session gate + readiness API smoke; Verify #28 |
+| T009 | Dispatch request and durable attempt | PASS | Serialized readiness gate + durable dispatch/event evidence + duplicate/serial dispatch tests; Verify #51 |
+| T010 | OpenCode local Builder adapter | REVIEW | CLI adapter + JSONL/process tests + fake executable smoke; actual local `opencode` binary acceptance pending |
+| T011 | Process supervision and runtime events | PASS | Success/failure/cancel/restart/shutdown supervision tests + dispatch smoke; Verify #51 |
+| T012 | TUI dispatch wiring | REVIEW | Keyboard task selection + explicit dispatch/cancel overlays + runtime event log + persistent action errors; Verify #57; manual real-OpenCode UI acceptance pending |
 
-`PASS` means the task acceptance is implemented and the current `dev` baseline has repository verification evidence. Integration into `main` remains a separate decision.
+`PASS` means task acceptance is implemented with repository verification evidence. `REVIEW` means implementation exists but a named acceptance step remains. `BLOCKED` means a required current source or human decision is unavailable. Integration into `dev` / `main` remains a separate decision.

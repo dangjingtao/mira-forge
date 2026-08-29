@@ -24,7 +24,16 @@ Second wave implemented and verified on `dev`:
 - dependency validation and read-only dispatch readiness;
 - active Builder-session dispatch gate.
 
-Forge still does **not** launch OpenCode, Codex, Pi Agent or another Builder/Reviewer itself. Those integrations belong behind adapters in a later milestone.
+Third wave is ready for manual acceptance on `feat/dispatch-opencode`:
+
+- durable dispatch attempts and runtime events;
+- first local OpenCode Builder process adapter;
+- serial first-use Builder policy;
+- process success/failure/cancel/restart/shutdown supervision;
+- keyboard-first TUI task selection, explicit dispatch/cancel, Builder busy state, and runtime-event history;
+- no automatic review PASS, push, merge or deployment.
+
+Repository verification passes through Verify #57. The remaining acceptance is one harmless dispatch through the UI using the user's actual locally installed `opencode` binary, including explicit cancel verification.
 
 ## Run locally
 
@@ -55,7 +64,7 @@ Then open `http://127.0.0.1:47831`.
 npm run check
 ```
 
-Verification runs unit/domain tests, TypeScript checking, dashboard build, the control-plane smoke, and the dispatch-readiness smoke.
+Verification runs unit/domain tests, TypeScript checking, dashboard build, the control-plane smoke, dispatch-readiness smoke, and on the third-wave branch a fake-OpenCode process smoke.
 
 ## Runtime API
 
@@ -71,6 +80,7 @@ GET   /api/batches
 POST  /api/batches
 PATCH /api/batches/:batchId/tasks/:taskId
 GET   /api/batches/:batchId/dispatch-ready
+POST  /api/batches/:batchId/tasks/:taskId/dispatch
 
 GET   /api/adapters
 POST  /api/adapters
@@ -83,6 +93,10 @@ PATCH /api/sessions/:sessionId
 GET   /api/reviews
 POST  /api/reviews
 POST  /api/reviews/:reviewId/result
+
+GET   /api/dispatches
+POST  /api/dispatches/:dispatchId/cancel
+GET   /api/events
 ```
 
 Example project registration:
@@ -116,7 +130,7 @@ review_passed
 integrated
 ```
 
-Adapters, sessions and review handoffs are runtime evidence, not a replacement requirement system. Review PASS is only actionable for the exact SHA that was handed to the reviewer. Dispatch readiness is read-only and does not start an agent.
+Adapters, sessions, review handoffs, dispatch attempts and runtime events are execution evidence, not a replacement requirement system. Review PASS is only actionable for the exact SHA that was handed to the reviewer. A successful Builder process exit only moves construction into the review stage; it cannot manufacture review PASS.
 
 See `docs/architecture.md` and `docs/workbench/00-work-ledger.md`.
 

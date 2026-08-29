@@ -20,6 +20,8 @@ test('store persists state atomically', async () => {
   assert.deepEqual(state.adapters, [])
   assert.deepEqual(state.sessions, [])
   assert.deepEqual(state.reviews, [])
+  assert.deepEqual(state.dispatches, [])
+  assert.deepEqual(state.events, [])
 
   const raw = await readFile(file, 'utf8')
   assert.doesNotThrow(() => JSON.parse(raw))
@@ -34,4 +36,20 @@ test('schema-1 state without additive runtime arrays remains readable', async ()
   assert.deepEqual(state.adapters, [])
   assert.deepEqual(state.sessions, [])
   assert.deepEqual(state.reviews, [])
+  assert.deepEqual(state.dispatches, [])
+  assert.deepEqual(state.events, [])
+})
+
+test('schema-1 state rejects malformed additive dispatch arrays', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mira-forge-invalid-dispatch-'))
+  const file = join(dir, 'state.json')
+  await writeFile(file, JSON.stringify({
+    schemaVersion: 1,
+    projects: [],
+    batches: [],
+    dispatches: {},
+    events: [],
+  }), 'utf8')
+
+  await assert.rejects(() => createStore(file).read(), /Unsupported or invalid Mira Forge state file/)
 })
