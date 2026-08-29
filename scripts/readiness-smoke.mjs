@@ -65,6 +65,17 @@ try {
     body: JSON.stringify({ name: 'Readiness Project', rootPath: tempDir, integrationBranch: 'dev' }),
   }))
 
+  const malformedBatch = await fetch(`${baseUrl}/api/batches`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ projectId: project.id, tasks: [{ id: 'T-malformed', dependsOn: 'T001' }] }),
+  })
+  if (malformedBatch.ok) throw new Error('Non-array dependency declaration was accepted')
+  const malformedBody = await malformedBatch.json()
+  if (!String(malformedBody.error || '').includes('task.dependsOn must be an array')) {
+    throw new Error(`Unexpected malformed dependency error: ${JSON.stringify(malformedBody)}`)
+  }
+
   const invalidBatch = await fetch(`${baseUrl}/api/batches`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
