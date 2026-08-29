@@ -72,7 +72,7 @@ try {
   })
   if (malformedBatch.ok) throw new Error('Non-array dependency declaration was accepted')
   const malformedBody = await malformedBatch.json()
-  if (!String(malformedBody.error || '').includes('task.dependsOn must be an array')) {
+  if (!String(malformedBody.message || malformedBody.error || '').includes('task.dependsOn must be an array')) {
     throw new Error(`Unexpected malformed dependency error: ${JSON.stringify(malformedBody)}`)
   }
 
