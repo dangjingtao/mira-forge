@@ -21,7 +21,7 @@ test('project, batch and task runtime state form the minimal pipeline', () => {
   updateTask(state, batch.id, 'T001', { status: 'building', builder: 'opencode' })
   assert.equal(batch.status, 'active')
 
-  updateTask(state, batch.id, 'T001', { status: 'reviewing', reviewRound: 1, currentSha: 'abc' })
+  updateTask(state, batch.id, 'T001', { status: 'reviewing', currentSha: 'abc' })
   assert.equal(batch.status, 'reviewing')
 })
 
@@ -32,7 +32,7 @@ test('invalid runtime status is rejected', () => {
   assert.throws(() => updateTask(state, batch.id, 'T001', { status: 'done-ish' }), /invalid task status/)
 })
 
-test('task patches cannot forge review pass evidence', () => {
+test('task patches cannot forge review evidence or review round', () => {
   const state = createEmptyState()
   const project = registerProject(state, { name: 'Demo', rootPath: '/tmp/demo' })
   const batch = createBatch(state, { projectId: project.id, tasks: [{ id: 'T001' }] })
@@ -45,6 +45,10 @@ test('task patches cannot forge review pass evidence', () => {
   assert.throws(
     () => updateTask(state, batch.id, 'T001', { reviewedSha: 'abc' }),
     /reviewedSha is managed by review handoff/,
+  )
+  assert.throws(
+    () => updateTask(state, batch.id, 'T001', { reviewRound: 99 }),
+    /reviewRound is managed by review handoff/,
   )
 })
 
@@ -207,6 +211,31 @@ test('valid review handoff binds a reviewer session and exact task SHA', () => {
   assert.equal(result.actionable, true)
   assert.equal(batch.tasks[0].status, 'review_passed')
   assert.equal(batch.tasks[0].reviewedSha, 'abc')
+})
+
+test('review rounds derive from durable review history, not mutable task projection', () => {
+  const { state, project, batch, reviewerSession } = reviewFixture()
+  const first = createReviewHandoff(state, {
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+    reviewerSessionId: reviewerSession.id,
+    sha: 'abc',
+  })
+  assert.equal(first.round, 1)
+  resolveReviewHandoff(state, first.id, { result: 'cancelled' })
+
+  // Simulate a corrupted/legacy task projection. New rounds must still follow review history.
+  batch.tasks[0].reviewRound = 99
+  const second = createReviewHandoff(state, {
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+    reviewerSessionId: reviewerSession.id,
+    sha: 'abc',
+  })
+  assert.equal(second.round, 2)
+  assert.equal(batch.tasks[0].reviewRound, 2)
 })
 
 test('review result rejects a SHA different from the requested SHA', () => {

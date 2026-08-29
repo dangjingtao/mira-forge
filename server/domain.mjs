@@ -234,17 +234,19 @@ export function createReviewHandoff(state, input) {
   }
   if (!ACTIVE_SESSION_STATUSES.includes(reviewerSession.status)) throw new Error('reviewer session is not active')
 
-  const pending = reviews(state).find((review) =>
-    review.projectId === projectId
-    && review.batchId === batchId
-    && review.taskId === taskId
-    && review.status === 'requested')
+  const history = reviews(state)
+  const taskHistory = history.filter((review) =>
+    review.projectId === projectId && review.batchId === batchId && review.taskId === taskId)
+  const pending = taskHistory.find((review) => review.status === 'requested')
   if (pending) throw new Error('pending review handoff already exists for task')
 
   const timestamp = now()
-  const round = (Number.isInteger(task.reviewRound) ? task.reviewRound : 0) + 1
+  const round = taskHistory.reduce(
+    (highest, review) => Number.isInteger(review.round) ? Math.max(highest, review.round) : highest,
+    0,
+  ) + 1
   const review = {
-    id: nextUniqueId(reviews(state), input.id, 'R', 'review'),
+    id: nextUniqueId(history, input.id, 'R', 'review'),
     projectId,
     batchId,
     taskId,
@@ -259,7 +261,7 @@ export function createReviewHandoff(state, input) {
     createdAt: timestamp,
     updatedAt: timestamp,
   }
-  reviews(state).push(review)
+  history.push(review)
 
   task.reviewRound = round
   task.reviewerSessionId = reviewerSessionId
@@ -379,6 +381,7 @@ export function updateTask(state, batchId, taskId, patch) {
 
   if (patch.status === 'review_passed') throw new Error('review_passed is managed by review handoff')
   if (patch.reviewedSha !== undefined) throw new Error('reviewedSha is managed by review handoff')
+  if (patch.reviewRound !== undefined) throw new Error('reviewRound is managed by review handoff')
 
   const currentShaChanged = patch.currentSha !== undefined && (patch.currentSha || null) !== task.currentSha
   let nextStatus = patch.status !== undefined ? patch.status : task.status
@@ -408,10 +411,6 @@ export function updateTask(state, batchId, taskId, patch) {
     }
   }
 
-  if (patch.reviewRound !== undefined) {
-    if (!Number.isInteger(patch.reviewRound) || patch.reviewRound < 0) throw new Error('reviewRound must be a non-negative integer')
-    task.reviewRound = patch.reviewRound
-  }
   if (patch.previewUrls !== undefined) {
     if (!patch.previewUrls || typeof patch.previewUrls !== 'object' || Array.isArray(patch.previewUrls)) throw new Error('previewUrls must be an object')
     task.previewUrls = patch.previewUrls
