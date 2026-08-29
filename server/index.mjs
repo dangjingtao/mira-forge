@@ -21,6 +21,9 @@ import {
   updateSession,
   updateTask,
 } from './domain.mjs'
+import { DISPATCH_STATUSES, getDispatches, getRuntimeEvents } from './dispatch-domain.mjs'
+import { createDispatchManager, OPENCODE_ADAPTER_ID } from './dispatch-manager.mjs'
+import { createOpenCodeRunner, parseOpenCodePrefixArgs } from './opencode-adapter.mjs'
 import { DISPATCHABLE_TASK_STATUSES, getDispatchReadiness, validateBatchDependencies } from './readiness.mjs'
 import { createStore } from './store.mjs'
 
@@ -31,6 +34,14 @@ const host = process.env.MIRA_FORGE_HOST || '127.0.0.1'
 const port = Number(process.env.MIRA_FORGE_PORT || 47831)
 const stateFile = process.env.MIRA_FORGE_STATE_FILE || join(homedir(), '.mira-forge', 'state.json')
 const store = createStore(stateFile)
+const openCodeRunner = createOpenCodeRunner({
+  bin: process.env.MIRA_FORGE_OPENCODE_BIN || 'opencode',
+  prefixArgs: parseOpenCodePrefixArgs(process.env.MIRA_FORGE_OPENCODE_PREFIX_ARGS),
+})
+const dispatchManager = createDispatchManager({
+  store,
+  runners: new Map([[OPENCODE_ADAPTER_ID, openCodeRunner]]),
+})
 
 function sendJson(response, status, payload) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
@@ -117,6 +128,17 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/api/reviews') {
       return sendJson(response, 200, (await store.read()).reviews)
     }
+    if (request.method === 'GET' && url.pathname === '/api/dispatches') {
+      return sendJson(response, 200, getDispatches(await store.read()))
+    }
+    if (request.method === 'GET' && url.pathname === '/api/events') {
+      let events = getRuntimeEvents(await store.read())
+      for (const key of ['projectId', 'batchId', 'taskId', 'dispatchId']) {
+        const value = url.searchParams.get(key)
+        if (value) events = events.filter((event) => event[key] === value)
+      }
+      return sendJson(response, 200, events)
+    }
     if (request.method === 'GET' && url.pathname === '/api/meta') {
       return sendJson(response, 200, {
         taskStatuses: TASK_STATUSES,
@@ -125,7 +147,9 @@ const server = createServer(async (request, response) => {
         sessionRoles: SESSION_ROLES,
         sessionStatuses: SESSION_STATUSES,
         reviewStatuses: REVIEW_STATUSES,
+        dispatchStatuses: DISPATCH_STATUSES,
         dispatchableTaskStatuses: DISPATCHABLE_TASK_STATUSES,
+        builtinBuilderAdapters: [OPENCODE_ADAPTER_ID],
       })
     }
     if (request.method === 'POST' && url.pathname === '/api/projects') {
@@ -182,6 +206,25 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 200, review)
     }
 
+    const dispatchTaskMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/tasks\/([^/]+)\/dispatch$/)
+    if (request.method === 'POST' && dispatchTaskMatch) {
+      const [, rawBatchId, rawTaskId] = dispatchTaskMatch
+      const body = await readJson(request)
+      const dispatch = await dispatchManager.dispatchTask({
+        ...body,
+        batchId: decodeURIComponent(rawBatchId),
+        taskId: decodeURIComponent(rawTaskId),
+      })
+      return sendJson(response, 202, dispatch)
+    }
+
+    const dispatchCancelMatch = url.pathname.match(/^\/api\/dispatches\/([^/]+)\/cancel$/)
+    if (request.method === 'POST' && dispatchCancelMatch) {
+      const [, rawDispatchId] = dispatchCancelMatch
+      const dispatch = await dispatchManager.cancelDispatch(decodeURIComponent(rawDispatchId))
+      return sendJson(response, 200, dispatch)
+    }
+
     const dispatchMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/dispatch-ready$/)
     if (request.method === 'GET' && dispatchMatch) {
       const [, rawBatchId] = dispatchMatch
@@ -208,7 +251,24 @@ const server = createServer(async (request, response) => {
   }
 })
 
+await dispatchManager.reconcile()
+
 server.listen(port, host, () => {
   console.log(`Mira Forge control plane: http://${host}:${port}`)
   console.log(`State: ${stateFile}`)
 })
+
+let shuttingDown = false
+async function shutdown() {
+  if (shuttingDown) return
+  shuttingDown = true
+  try {
+    await dispatchManager.shutdown()
+  } finally {
+    server.close(() => process.exit(0))
+    setTimeout(() => process.exit(0), 1500).unref()
+  }
+}
+
+process.once('SIGINT', () => { void shutdown() })
+process.once('SIGTERM', () => { void shutdown() })
