@@ -13,6 +13,6 @@
 | T009 | Dispatch request and durable attempt | PASS | Serialized readiness gate + durable dispatch/event evidence + duplicate/serial dispatch tests; Verify #51 |
 | T010 | OpenCode local Builder adapter | REVIEW | CLI adapter + JSONL/process tests + fake executable smoke; actual local `opencode` binary acceptance pending |
 | T011 | Process supervision and runtime events | PASS | Success/failure/cancel/restart/shutdown supervision tests + dispatch smoke; Verify #51 |
-| T012 | TUI dispatch wiring | BLOCKED | Current keyboard-first TUI source is not yet present on remote `dev`; do not implement against stale `src/` |
+| T012 | TUI dispatch wiring | REVIEW | Keyboard task selection + explicit dispatch/cancel overlays + runtime event log + persistent action errors; Verify #57; manual real-OpenCode UI acceptance pending |
 
 `PASS` means task acceptance is implemented with repository verification evidence. `REVIEW` means implementation exists but a named acceptance step remains. `BLOCKED` means a required current source or human decision is unavailable. Integration into `dev` / `main` remains a separate decision.

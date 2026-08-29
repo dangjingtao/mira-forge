@@ -24,15 +24,16 @@ Second wave implemented and verified on `dev`:
 - dependency validation and read-only dispatch readiness;
 - active Builder-session dispatch gate.
 
-Third-wave backend is being verified on `feat/dispatch-opencode`:
+Third wave is ready for manual acceptance on `feat/dispatch-opencode`:
 
 - durable dispatch attempts and runtime events;
 - first local OpenCode Builder process adapter;
 - serial first-use Builder policy;
 - process success/failure/cancel/restart/shutdown supervision;
+- keyboard-first TUI task selection, explicit dispatch/cancel, Builder busy state, and runtime-event history;
 - no automatic review PASS, push, merge or deployment.
 
-The real local OpenCode binary still requires one machine-level acceptance run, and TUI dispatch wiring waits for the current keyboard-first UI source to be pushed.
+Repository verification passes through Verify #57. The remaining acceptance is one harmless dispatch through the UI using the user's actual locally installed `opencode` binary, including explicit cancel verification.
 
 ## Run locally
 
