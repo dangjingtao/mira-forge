@@ -1,6 +1,6 @@
 # T005 — Adapter registry and heartbeat
 
-Status: DOING
+Status: PASS
 
 ## Goal
 
@@ -23,6 +23,6 @@ Give the control plane a provider-neutral registry for Builder, Reviewer and Git
 - Storing credentials, tokens or remote secrets.
 - Automatic stale-timeout scheduling.
 
-## Validation
+## Evidence
 
-Domain tests + persistence compatibility + HTTP smoke + repository Verify.
+Implemented in `server/domain.mjs`, `server/store.mjs` and `server/index.mjs`; domain/store tests and HTTP smoke cover registration, heartbeat and legacy state compatibility. GitHub Actions Verify #25 passed `test + typecheck + build + smoke` on commit `0878a1f0bcc0`.

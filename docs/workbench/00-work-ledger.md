@@ -6,8 +6,8 @@
 | T002 | Durable project/batch/task ledger | PASS | Atomic JSON store + persistence/domain tests; Verify #18 |
 | T003 | Project registry and runtime API | PASS | Runtime API + review-SHA/batch-ID regression tests; Verify #18 |
 | T004 | Minimal global progress dashboard | PASS | React/Vite dashboard + manual register/refresh persistence check; Verify #18 |
-| T005 | Adapter registry and heartbeat | DOING | — |
-| T006 | Agent session lifecycle | TODO | — |
+| T005 | Adapter registry and heartbeat | PASS | Provider-neutral registry + heartbeat + legacy-state compatibility; Verify #25 |
+| T006 | Agent session lifecycle | DOING | Implementation under verification |
 | T007 | SHA-bound review handoff history | TODO | — |
 | T008 | Dispatch readiness and dependency gate | TODO | — |
 

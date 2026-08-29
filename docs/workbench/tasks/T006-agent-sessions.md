@@ -1,6 +1,6 @@
 # T006 — Agent session lifecycle
 
-Status: TODO
+Status: DOING
 
 ## Goal
 
@@ -14,10 +14,11 @@ Represent Builder and Reviewer execution sessions as durable runtime facts that 
 - Keep current Builder/Reviewer session pointers on the task while preserving session history.
 - Reject a second active session for the same task/role unless the previous one is terminal.
 - Session completion/failure/disconnect must not delete task state.
+- Existing schema-1 state files without a `sessions` array remain readable.
 
 ## Dependencies
 
-- T005 adapter registry.
+- T005 adapter registry — PASS.
 
 ## Out of scope
 
@@ -27,4 +28,4 @@ Represent Builder and Reviewer execution sessions as durable runtime facts that 
 
 ## Validation
 
-Domain transition tests + API smoke + repository Verify.
+Domain transition tests + legacy persistence compatibility + API smoke + repository Verify.

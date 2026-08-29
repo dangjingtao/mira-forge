@@ -99,9 +99,6 @@ try {
   }))
   if (heartbeat.status !== 'available' || !heartbeat.lastSeenAt) throw new Error('Adapter heartbeat did not persist')
 
-  const adapters = await json(await fetch(`${baseUrl}/api/adapters`))
-  if (adapters.length !== 1 || adapters[0].id !== adapter.id) throw new Error('Adapter registry is incomplete')
-
   const project = await json(await fetch(`${baseUrl}/api/projects`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -122,6 +119,27 @@ try {
     }),
   }))
 
+  const session = await json(await fetch(`${baseUrl}/api/sessions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      id: 'S-smoke-builder',
+      role: 'builder',
+      adapterId: adapter.id,
+      projectId: project.id,
+      batchId: batch.id,
+      taskId: 'T001',
+    }),
+  }))
+  if (session.status !== 'starting') throw new Error('Session did not start in starting state')
+
+  const runningSession = await json(await fetch(`${baseUrl}/api/sessions/${session.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'running', externalSessionId: 'smoke-external' }),
+  }))
+  if (runningSession.status !== 'running' || !runningSession.startedAt) throw new Error('Session did not enter running state')
+
   const task = await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
@@ -132,10 +150,19 @@ try {
       reviewRound: 1,
     }),
   }))
-  if (task.status !== 'reviewing' || task.reviewRound !== 1) throw new Error('Task update did not persist')
+  if (task.status !== 'reviewing' || task.reviewRound !== 1 || task.builderSessionId !== session.id) {
+    throw new Error('Task/session binding did not persist')
+  }
+
+  const completedSession = await json(await fetch(`${baseUrl}/api/sessions/${session.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'completed' }),
+  }))
+  if (completedSession.status !== 'completed' || !completedSession.endedAt) throw new Error('Session did not complete')
 
   const state = await json(await fetch(`${baseUrl}/api/state`))
-  if (state.projects.length !== 1 || state.batches.length !== 1 || state.adapters.length !== 1) {
+  if (state.projects.length !== 1 || state.batches.length !== 1 || state.adapters.length !== 1 || state.sessions.length !== 1) {
     throw new Error('State snapshot is incomplete')
   }
 

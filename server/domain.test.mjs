@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createBatch, heartbeatAdapter, registerAdapter, registerProject, updateTask } from './domain.mjs'
+import {
+  createBatch,
+  createSession,
+  heartbeatAdapter,
+  registerAdapter,
+  registerProject,
+  updateSession,
+  updateTask,
+} from './domain.mjs'
 import { createEmptyState } from './store.mjs'
 
 test('project, batch and task runtime state form the minimal pipeline', () => {
@@ -92,4 +100,77 @@ test('adapter registry rejects duplicate ids and unknown kinds/statuses', () => 
     () => heartbeatAdapter(state, 'reviewer-local', { status: 'sleeping' }),
     /invalid adapter status/,
   )
+})
+
+function sessionFixture() {
+  const state = createEmptyState()
+  const project = registerProject(state, { name: 'Demo', rootPath: '/tmp/demo' })
+  const batch = createBatch(state, { projectId: project.id, tasks: [{ id: 'T001' }] })
+  const builder = registerAdapter(state, { id: 'builder-local', name: 'Builder', kind: 'builder' })
+  const reviewer = registerAdapter(state, { id: 'reviewer-local', name: 'Reviewer', kind: 'reviewer' })
+  return { state, project, batch, builder, reviewer }
+}
+
+test('session binds a compatible adapter to an existing task and preserves history', () => {
+  const { state, project, batch, builder } = sessionFixture()
+  const session = createSession(state, {
+    id: 'S-builder-1',
+    role: 'builder',
+    adapterId: builder.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  })
+
+  assert.equal(session.status, 'starting')
+  assert.equal(batch.tasks[0].builderSessionId, session.id)
+  updateSession(state, session.id, { status: 'running', externalSessionId: 'external-42' })
+  assert.ok(session.startedAt)
+  assert.equal(session.externalSessionId, 'external-42')
+  updateSession(state, session.id, { status: 'completed' })
+  assert.ok(session.endedAt)
+  assert.equal(state.sessions.length, 1)
+
+  const next = createSession(state, {
+    id: 'S-builder-2',
+    role: 'builder',
+    adapterId: builder.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  })
+  assert.equal(batch.tasks[0].builderSessionId, next.id)
+  assert.equal(state.sessions.length, 2)
+})
+
+test('session lifecycle rejects incompatible adapters, duplicate active roles and invalid transitions', () => {
+  const { state, project, batch, builder, reviewer } = sessionFixture()
+
+  assert.throws(() => createSession(state, {
+    role: 'builder',
+    adapterId: reviewer.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  }), /incompatible/)
+
+  const session = createSession(state, {
+    role: 'builder',
+    adapterId: builder.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  })
+  assert.throws(() => createSession(state, {
+    role: 'builder',
+    adapterId: builder.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  }), /active builder session already exists/)
+
+  assert.throws(() => updateSession(state, session.id, { status: 'waiting' }), /invalid session transition/)
+  updateSession(state, session.id, { status: 'running' })
+  updateSession(state, session.id, { status: 'failed' })
+  assert.throws(() => updateSession(state, session.id, { status: 'running' }), /invalid session transition/)
 })

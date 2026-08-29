@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 export function createEmptyState() {
-  return { schemaVersion: 1, projects: [], batches: [], adapters: [] }
+  return { schemaVersion: 1, projects: [], batches: [], adapters: [], sessions: [] }
 }
 
 function normalizeState(parsed) {
@@ -12,7 +12,14 @@ function normalizeState(parsed) {
   if (parsed.adapters !== undefined && !Array.isArray(parsed.adapters)) {
     throw new Error('Unsupported or invalid Mira Forge state file')
   }
-  return { ...parsed, adapters: parsed.adapters ?? [] }
+  if (parsed.sessions !== undefined && !Array.isArray(parsed.sessions)) {
+    throw new Error('Unsupported or invalid Mira Forge state file')
+  }
+  return {
+    ...parsed,
+    adapters: parsed.adapters ?? [],
+    sessions: parsed.sessions ?? [],
+  }
 }
 
 export function createStore(filePath) {

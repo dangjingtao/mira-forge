@@ -14,6 +14,19 @@ export const TASK_STATUSES = [
 
 export const ADAPTER_KINDS = ['builder', 'reviewer', 'git']
 export const ADAPTER_STATUSES = ['available', 'busy', 'offline', 'error']
+export const SESSION_ROLES = ['builder', 'reviewer']
+export const SESSION_STATUSES = ['starting', 'running', 'waiting', 'completed', 'failed', 'disconnected']
+
+const ACTIVE_SESSION_STATUSES = ['starting', 'running', 'waiting']
+const TERMINAL_SESSION_STATUSES = ['completed', 'failed', 'disconnected']
+const SESSION_TRANSITIONS = {
+  starting: ['running', 'completed', 'failed', 'disconnected'],
+  running: ['waiting', 'completed', 'failed', 'disconnected'],
+  waiting: ['running', 'completed', 'failed', 'disconnected'],
+  completed: [],
+  failed: [],
+  disconnected: [],
+}
 
 function now() {
   return new Date().toISOString()
@@ -36,6 +49,11 @@ function adapters(state) {
   return state.adapters
 }
 
+function sessions(state) {
+  if (!Array.isArray(state.sessions)) state.sessions = []
+  return state.sessions
+}
+
 function nextAdapterId(state, inputId) {
   const current = adapters(state)
   const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
@@ -51,6 +69,21 @@ function nextAdapterId(state, inputId) {
   return id
 }
 
+function nextSessionId(state, inputId) {
+  const current = sessions(state)
+  const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
+  if (explicitId) {
+    if (current.some((session) => session.id === explicitId)) throw new Error(`duplicate session id: ${explicitId}`)
+    return explicitId
+  }
+
+  let id
+  do {
+    id = `S-${randomUUID().slice(0, 12)}`
+  } while (current.some((session) => session.id === id))
+  return id
+}
+
 function nextBatchId(state, inputId) {
   const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
   if (explicitId) {
@@ -63,6 +96,16 @@ function nextBatchId(state, inputId) {
     id = `B-${randomUUID().slice(0, 8)}`
   } while (state.batches.some((batch) => batch.id === id))
   return id
+}
+
+function resolveTaskBinding(state, projectId, batchId, taskId) {
+  const project = state.projects.find((item) => item.id === projectId)
+  if (!project) throw new Error('projectId not found')
+  const batch = state.batches.find((item) => item.id === batchId && item.projectId === projectId)
+  if (!batch) throw new Error('batchId not found for project')
+  const task = batch.tasks.find((item) => item.id === taskId)
+  if (!task) throw new Error('taskId not found in batch')
+  return { project, batch, task }
 }
 
 export function registerAdapter(state, input) {
@@ -99,6 +142,77 @@ export function heartbeatAdapter(state, adapterId, input = {}) {
   adapter.lastSeenAt = timestamp
   adapter.updatedAt = timestamp
   return adapter
+}
+
+export function createSession(state, input) {
+  const role = requiredString(input.role, 'role')
+  if (!SESSION_ROLES.includes(role)) throw new Error(`invalid session role: ${role}`)
+
+  const adapterId = requiredString(input.adapterId, 'adapterId')
+  const adapter = adapters(state).find((item) => item.id === adapterId)
+  if (!adapter) throw new Error('adapterId not found')
+  if (adapter.kind !== role) throw new Error(`adapter kind ${adapter.kind} is incompatible with session role ${role}`)
+
+  const projectId = requiredString(input.projectId, 'projectId')
+  const batchId = requiredString(input.batchId, 'batchId')
+  const taskId = requiredString(input.taskId, 'taskId')
+  const { task } = resolveTaskBinding(state, projectId, batchId, taskId)
+
+  const active = sessions(state).find((session) =>
+    session.projectId === projectId
+    && session.batchId === batchId
+    && session.taskId === taskId
+    && session.role === role
+    && ACTIVE_SESSION_STATUSES.includes(session.status))
+  if (active) throw new Error(`active ${role} session already exists for task`)
+
+  const timestamp = now()
+  const session = {
+    id: nextSessionId(state, input.id),
+    role,
+    adapterId,
+    projectId,
+    batchId,
+    taskId,
+    status: 'starting',
+    externalSessionId: typeof input.externalSessionId === 'string' && input.externalSessionId.trim() ? input.externalSessionId.trim() : null,
+    startedAt: null,
+    endedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  sessions(state).push(session)
+
+  if (role === 'builder') task.builderSessionId = session.id
+  if (role === 'reviewer') task.reviewerSessionId = session.id
+  task.updatedAt = timestamp
+  return session
+}
+
+export function updateSession(state, sessionId, patch) {
+  const session = sessions(state).find((item) => item.id === sessionId)
+  if (!session) throw new Error('session not found')
+
+  const timestamp = now()
+  if (patch.status !== undefined) {
+    const nextStatus = requiredString(patch.status, 'status')
+    if (!SESSION_STATUSES.includes(nextStatus)) throw new Error(`invalid session status: ${nextStatus}`)
+    if (nextStatus !== session.status && !SESSION_TRANSITIONS[session.status].includes(nextStatus)) {
+      throw new Error(`invalid session transition: ${session.status} -> ${nextStatus}`)
+    }
+    if (session.status !== 'running' && nextStatus === 'running' && !session.startedAt) session.startedAt = timestamp
+    if (TERMINAL_SESSION_STATUSES.includes(nextStatus)) session.endedAt = timestamp
+    session.status = nextStatus
+  }
+
+  if (patch.externalSessionId !== undefined) {
+    session.externalSessionId = typeof patch.externalSessionId === 'string' && patch.externalSessionId.trim()
+      ? patch.externalSessionId.trim()
+      : null
+  }
+
+  session.updatedAt = timestamp
+  return session
 }
 
 export function registerProject(state, input) {
@@ -139,6 +253,7 @@ export function createBatch(state, input) {
       status: 'waiting',
       builder: task.builder?.trim() || null,
       builderSessionId: null,
+      reviewerSessionId: null,
       worktree: null,
       baseSha: task.baseSha?.trim() || null,
       currentSha: null,
@@ -193,7 +308,7 @@ export function updateTask(state, batchId, taskId, patch) {
 
   task.status = nextStatus
 
-  const scalarFields = ['builder', 'builderSessionId', 'worktree', 'baseSha', 'currentSha', 'reviewedSha']
+  const scalarFields = ['builder', 'builderSessionId', 'reviewerSessionId', 'worktree', 'baseSha', 'currentSha', 'reviewedSha']
   for (const field of scalarFields) {
     if (patch[field] !== undefined) task[field] = patch[field] || null
   }

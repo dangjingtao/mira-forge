@@ -8,10 +8,14 @@ import {
   ADAPTER_KINDS,
   ADAPTER_STATUSES,
   createBatch,
+  createSession,
   heartbeatAdapter,
   registerAdapter,
   registerProject,
+  SESSION_ROLES,
+  SESSION_STATUSES,
   TASK_STATUSES,
+  updateSession,
   updateTask,
 } from './domain.mjs'
 import { createStore } from './store.mjs'
@@ -103,11 +107,16 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/api/adapters') {
       return sendJson(response, 200, (await store.read()).adapters)
     }
+    if (request.method === 'GET' && url.pathname === '/api/sessions') {
+      return sendJson(response, 200, (await store.read()).sessions)
+    }
     if (request.method === 'GET' && url.pathname === '/api/meta') {
       return sendJson(response, 200, {
         taskStatuses: TASK_STATUSES,
         adapterKinds: ADAPTER_KINDS,
         adapterStatuses: ADAPTER_STATUSES,
+        sessionRoles: SESSION_ROLES,
+        sessionStatuses: SESSION_STATUSES,
       })
     }
     if (request.method === 'POST' && url.pathname === '/api/projects') {
@@ -125,6 +134,11 @@ const server = createServer(async (request, response) => {
       const adapter = await store.mutate((state) => registerAdapter(state, body))
       return sendJson(response, 201, adapter)
     }
+    if (request.method === 'POST' && url.pathname === '/api/sessions') {
+      const body = await readJson(request)
+      const session = await store.mutate((state) => createSession(state, body))
+      return sendJson(response, 201, session)
+    }
 
     const heartbeatMatch = url.pathname.match(/^\/api\/adapters\/([^/]+)\/heartbeat$/)
     if (request.method === 'POST' && heartbeatMatch) {
@@ -132,6 +146,14 @@ const server = createServer(async (request, response) => {
       const body = await readJson(request)
       const adapter = await store.mutate((state) => heartbeatAdapter(state, decodeURIComponent(rawAdapterId), body))
       return sendJson(response, 200, adapter)
+    }
+
+    const sessionMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)$/)
+    if (request.method === 'PATCH' && sessionMatch) {
+      const [, rawSessionId] = sessionMatch
+      const body = await readJson(request)
+      const session = await store.mutate((state) => updateSession(state, decodeURIComponent(rawSessionId), body))
+      return sendJson(response, 200, session)
     }
 
     const taskMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/tasks\/([^/]+)$/)
