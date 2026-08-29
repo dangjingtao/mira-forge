@@ -63,6 +63,19 @@ test('explicit duplicate batch ids are rejected', () => {
   )
 })
 
+test('batch creation rejects non-array dependency declarations', () => {
+  const state = createEmptyState()
+  const project = registerProject(state, { name: 'Demo', rootPath: '/tmp/demo' })
+
+  assert.throws(
+    () => createBatch(state, {
+      projectId: project.id,
+      tasks: [{ id: 'T002', dependsOn: 'T001' }],
+    }),
+    /task.dependsOn must be an array/,
+  )
+})
+
 test('adapter registry is provider-neutral and heartbeat updates liveness', () => {
   const state = createEmptyState()
   const adapter = registerAdapter(state, {
@@ -172,6 +185,25 @@ test('session lifecycle rejects incompatible adapters, duplicate active roles an
   assert.throws(() => updateSession(state, session.id, { status: 'running' }), /invalid session transition/)
 })
 
+test('idempotent terminal session updates preserve the original endedAt', async () => {
+  const { state, project, batch, builder } = sessionFixture()
+  const session = createSession(state, {
+    role: 'builder',
+    adapterId: builder.id,
+    projectId: project.id,
+    batchId: batch.id,
+    taskId: 'T001',
+  })
+
+  updateSession(state, session.id, { status: 'running' })
+  updateSession(state, session.id, { status: 'completed' })
+  const endedAt = session.endedAt
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  updateSession(state, session.id, { status: 'completed' })
+
+  assert.equal(session.endedAt, endedAt)
+})
+
 function reviewFixture() {
   const state = createEmptyState()
   const project = registerProject(state, { name: 'Review Demo', rootPath: '/tmp/review-demo' })
@@ -273,6 +305,29 @@ test('changing current SHA invalidates an earlier pass while preserving review h
   assert.equal(review.status, 'passed')
   assert.equal(review.actionable, false)
   assert.ok(review.invalidatedAt)
+})
+
+test('changing SHA invalidates waiting-integration and integrated states derived from an old pass', () => {
+  for (const postPassStatus of ['waiting_integration', 'integrated']) {
+    const { state, project, batch, reviewerSession } = reviewFixture()
+    const review = createReviewHandoff(state, {
+      projectId: project.id,
+      batchId: batch.id,
+      taskId: 'T001',
+      reviewerSessionId: reviewerSession.id,
+      sha: 'abc',
+    })
+    resolveReviewHandoff(state, review.id, { result: 'passed', reviewedSha: 'abc' })
+    updateTask(state, batch.id, 'T001', { status: postPassStatus })
+
+    updateTask(state, batch.id, 'T001', { currentSha: 'def' })
+
+    assert.equal(batch.tasks[0].status, 'stale')
+    assert.equal(batch.tasks[0].reviewedSha, null)
+    assert.equal(batch.status, 'attention')
+    assert.equal(review.actionable, false)
+    assert.ok(review.invalidatedAt)
+  }
 })
 
 test('a review resolved after task SHA changed is recorded but non-actionable', () => {
