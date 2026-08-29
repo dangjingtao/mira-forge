@@ -128,9 +128,17 @@ try {
   if (builtTask.currentSha !== 'smoke-sha' || builtTask.builderSessionId !== builderSession.id) {
     throw new Error('Builder task binding did not persist')
   }
-  await json(await fetch(`${baseUrl}/api/sessions/${builderSession.id}`, {
+  const completedBuilderSession = await json(await fetch(`${baseUrl}/api/sessions/${builderSession.id}`, {
     method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'completed' }),
   }))
+  const originalEndedAt = completedBuilderSession.endedAt
+  await sleep(5)
+  const retriedCompletedBuilderSession = await json(await fetch(`${baseUrl}/api/sessions/${builderSession.id}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'completed' }),
+  }))
+  if (retriedCompletedBuilderSession.endedAt !== originalEndedAt) {
+    throw new Error('Idempotent terminal session retry changed endedAt')
+  }
 
   const reviewerSession = await json(await fetch(`${baseUrl}/api/sessions`, {
     method: 'POST',
@@ -174,6 +182,24 @@ try {
   ) throw new Error('State snapshot is incomplete')
   if (storedTask.status !== 'review_passed' || storedTask.reviewedSha !== 'smoke-sha') {
     throw new Error('Valid review handoff did not update task review state')
+  }
+
+  await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'waiting_integration' }),
+  }))
+  const staleTask = await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ currentSha: 'smoke-sha-2' }),
+  }))
+  if (staleTask.status !== 'stale' || staleTask.reviewedSha !== null) {
+    throw new Error('Changing SHA did not invalidate post-pass task state')
+  }
+  const stateAfterShaChange = await json(await fetch(`${baseUrl}/api/state`))
+  if (stateAfterShaChange.reviews[0].actionable !== false || !stateAfterShaChange.reviews[0].invalidatedAt) {
+    throw new Error('Changing SHA did not invalidate durable review evidence')
   }
 
   const forgedPass = await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
