@@ -114,7 +114,8 @@ function formatEventData(event: RuntimeEvent) {
 
 function App() {
   const [state, setState] = useState<ForgeState | null>(null)
-  const [error, setError] = useState('')
+  const [connectionError, setConnectionError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [saving, setSaving] = useState(false)
   const [activeProject, setActiveProject] = useState(0)
   const [registering, setRegistering] = useState(false)
@@ -132,9 +133,9 @@ function App() {
       const response = await fetch('/api/state')
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       setState(await response.json())
-      setError('')
+      setConnectionError('')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setConnectionError(cause instanceof Error ? cause.message : String(cause))
     }
   }, [])
 
@@ -210,11 +211,11 @@ function App() {
 
   const prepareDispatch = useCallback(async () => {
     if (!selectedTask) {
-      setError('select a task row before dispatch')
+      setActionError('select a task row before dispatch')
       return
     }
     if (activeBuilderDispatch) {
-      setError(`${builtinBuilder} is busy with ${activeBuilderDispatch.taskId}; first-use dispatch is serial`)
+      setActionError(`${builtinBuilder} is busy with ${activeBuilderDispatch.taskId}; first-use dispatch is serial`)
       return
     }
 
@@ -232,20 +233,20 @@ function App() {
 
       setDispatchTask(selectedTask)
       setPalette(false)
-      setError('')
+      setActionError('')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setActionError(cause instanceof Error ? cause.message : String(cause))
     }
   }, [activeBuilderDispatch, selectedTask])
 
   const prepareCancel = useCallback(() => {
     if (!selectedActiveDispatch) {
-      setError('selected task has no active dispatch')
+      setActionError('selected task has no active dispatch')
       return
     }
     setCancelTarget(selectedActiveDispatch)
     setPalette(false)
-    setError('')
+    setActionError('')
   }, [selectedActiveDispatch])
 
   useEffect(() => {
@@ -343,9 +344,10 @@ function App() {
       if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
       event.currentTarget.reset()
       setRegistering(false)
+      setActionError('')
       await load()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setActionError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setSaving(false)
     }
@@ -374,10 +376,10 @@ function App() {
       const body = await response.json()
       if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
       setDispatchTask(null)
-      setError('')
+      setActionError('')
       await load()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setActionError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setDispatching(false)
     }
@@ -393,10 +395,10 @@ function App() {
       const body = await response.json()
       if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
       setCancelTarget(null)
-      setError('')
+      setActionError('')
       await load()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setActionError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setCancelling(false)
     }
@@ -411,7 +413,7 @@ function App() {
       <header className="topbar">
         <span className="brand">MIRA FORGE</span>
         <span className="crumb">/ control plane / {selected?.name ?? 'workspace'}</span>
-        <span className="connection"><i /> LOCAL · LIVE</span>
+        <span className={`connection ${connectionError ? 'degraded' : ''}`}><i /> {connectionError ? 'LOCAL · DEGRADED' : 'LOCAL · LIVE'}</span>
       </header>
 
       <div className="workspace">
@@ -448,7 +450,7 @@ function App() {
             <button className="refresh" onClick={() => void load()} title="Refresh (r)">↻ <kbd>r</kbd></button>
           </div>
 
-          {error && <div className="error-line">! {error}</div>}
+          {(actionError || connectionError) && <div className="error-line" aria-live="polite">! {actionError || `control service: ${connectionError}`}</div>}
 
           {selected ? (
             <>
