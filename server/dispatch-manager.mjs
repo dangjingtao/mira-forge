@@ -57,6 +57,11 @@ function ensureBuilderAdapter(state, adapterId) {
   return adapter
 }
 
+function findActiveAdapterDispatch(state, adapterId) {
+  return getDispatches(state).find((dispatch) =>
+    dispatch.adapterId === adapterId && !isTerminalDispatch(dispatch.status))
+}
+
 export function buildTaskDispatchPrompt({ project, batch, task, taskRef }) {
   const ref = requiredString(taskRef, 'taskRef')
   const base = task.baseSha || batch.baseSha || null
@@ -234,6 +239,11 @@ export function createDispatchManager({ store, runners }) {
       }
 
       const adapter = ensureBuilderAdapter(state, adapterId)
+      const activeAdapterDispatch = findActiveAdapterDispatch(state, adapter.id)
+      if (activeAdapterDispatch) {
+        throw new Error(`builder adapter already has an active dispatch: ${activeAdapterDispatch.id}`)
+      }
+
       const promptInfo = resolvePrompt(input, binding)
       const session = createSession(state, {
         role: 'builder',
