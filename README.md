@@ -120,6 +120,8 @@ Adapters, sessions and review handoffs are runtime evidence, not a replacement r
 
 See `docs/architecture.md` and `docs/workbench/00-work-ledger.md`.
 
+The dashboard interaction contract and keyboard event model are documented in `docs/tui-interaction.md`.
+
 ## Branches
 
 - `main`: stable baseline

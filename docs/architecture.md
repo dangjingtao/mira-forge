@@ -21,6 +21,8 @@ Managed Projects / Task Cards
 
 The dashboard is a client. A project Vite server is a preview runtime. Neither owns orchestration state.
 
+The dashboard follows a keyboard-first, terminal-inspired interaction contract. See `docs/tui-interaction.md` for the region model, key bindings, event rules, and UI acceptance checklist.
+
 ## State layers
 
 Managed projects keep product truth such as `TODO / DOING / REVIEW / PASS` in their own task system.
