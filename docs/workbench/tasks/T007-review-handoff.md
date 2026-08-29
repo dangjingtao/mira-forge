@@ -1,6 +1,6 @@
 # T007 — SHA-bound review handoff history
 
-Status: DOING
+Status: PASS
 
 ## Goal
 
@@ -28,6 +28,6 @@ Make review handoff an explicit durable record rather than a few mutable task fi
 - GitHub PR review comments.
 - Automatic merge.
 
-## Validation
+## Evidence
 
-Review-domain regression tests + legacy persistence compatibility + API smoke + repository Verify.
+Implemented in `server/domain.mjs`, `server/store.mjs` and `server/index.mjs`; tests cover exact-SHA binding, anti-forgery, late stale results, pass invalidation after SHA changes, history retention and batch-state derivation. HTTP smoke covers Builder → Reviewer → review handoff → SHA-bound PASS. GitHub Actions Verify #27 passed `test + typecheck + build + smoke` on commit `ae6de6197065`.

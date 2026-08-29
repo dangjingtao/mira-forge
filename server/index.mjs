@@ -21,6 +21,7 @@ import {
   updateSession,
   updateTask,
 } from './domain.mjs'
+import { DISPATCHABLE_TASK_STATUSES, getDispatchReadiness, validateBatchDependencies } from './readiness.mjs'
 import { createStore } from './store.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -124,6 +125,7 @@ const server = createServer(async (request, response) => {
         sessionRoles: SESSION_ROLES,
         sessionStatuses: SESSION_STATUSES,
         reviewStatuses: REVIEW_STATUSES,
+        dispatchableTaskStatuses: DISPATCHABLE_TASK_STATUSES,
       })
     }
     if (request.method === 'POST' && url.pathname === '/api/projects') {
@@ -133,7 +135,11 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === 'POST' && url.pathname === '/api/batches') {
       const body = await readJson(request)
-      const batch = await store.mutate((state) => createBatch(state, body))
+      const batch = await store.mutate((state) => {
+        const created = createBatch(state, body)
+        validateBatchDependencies(created)
+        return created
+      })
       return sendJson(response, 201, batch)
     }
     if (request.method === 'POST' && url.pathname === '/api/adapters') {
@@ -174,6 +180,13 @@ const server = createServer(async (request, response) => {
       const body = await readJson(request)
       const review = await store.mutate((state) => resolveReviewHandoff(state, decodeURIComponent(rawReviewId), body))
       return sendJson(response, 200, review)
+    }
+
+    const dispatchMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/dispatch-ready$/)
+    if (request.method === 'GET' && dispatchMatch) {
+      const [, rawBatchId] = dispatchMatch
+      const readiness = getDispatchReadiness(await store.read(), decodeURIComponent(rawBatchId))
+      return sendJson(response, 200, readiness)
     }
 
     const taskMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/tasks\/([^/]+)$/)
