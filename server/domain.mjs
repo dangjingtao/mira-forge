@@ -21,6 +21,20 @@ function requiredString(value, name) {
   return value.trim()
 }
 
+function nextBatchId(state, inputId) {
+  const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
+  if (explicitId) {
+    if (state.batches.some((batch) => batch.id === explicitId)) throw new Error(`duplicate batch id: ${explicitId}`)
+    return explicitId
+  }
+
+  let id
+  do {
+    id = `B-${randomUUID().slice(0, 8)}`
+  } while (state.batches.some((batch) => batch.id === id))
+  return id
+}
+
 export function registerProject(state, input) {
   const rootPath = requiredString(input.rootPath, 'rootPath')
   const existing = state.projects.find((project) => project.rootPath === rootPath)
@@ -72,7 +86,7 @@ export function createBatch(state, input) {
   })
 
   const batch = {
-    id: input.id?.trim() || `B-${randomUUID().slice(0, 8)}`,
+    id: nextBatchId(state, input.id),
     projectId,
     name: input.name?.trim() || `Batch ${state.batches.length + 1}`,
     status: 'planned',
@@ -100,10 +114,18 @@ export function updateTask(state, batchId, taskId, patch) {
   const task = batch.tasks.find((item) => item.id === taskId)
   if (!task) throw new Error('task not found')
 
-  if (patch.status !== undefined) {
-    if (!TASK_STATUSES.includes(patch.status)) throw new Error(`invalid task status: ${patch.status}`)
-    task.status = patch.status
+  const nextStatus = patch.status !== undefined ? patch.status : task.status
+  if (!TASK_STATUSES.includes(nextStatus)) throw new Error(`invalid task status: ${nextStatus}`)
+
+  const nextCurrentSha = patch.currentSha !== undefined ? patch.currentSha || null : task.currentSha
+  const nextReviewedSha = patch.reviewedSha !== undefined ? patch.reviewedSha || null : task.reviewedSha
+  if (nextStatus === 'review_passed') {
+    if (!nextReviewedSha) throw new Error('reviewedSha is required for review_passed')
+    if (!nextCurrentSha) throw new Error('currentSha is required for review_passed')
+    if (nextReviewedSha !== nextCurrentSha) throw new Error('reviewedSha must match currentSha for review_passed')
   }
+
+  task.status = nextStatus
 
   const scalarFields = ['builder', 'builderSessionId', 'worktree', 'baseSha', 'currentSha', 'reviewedSha']
   for (const field of scalarFields) {
