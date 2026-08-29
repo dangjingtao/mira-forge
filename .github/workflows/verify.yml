@@ -1,8 +1,10 @@
 name: Verify
 
 on:
+  push:
+    branches: [dev, main]
   pull_request:
-    branches: [main]
+    branches: [dev, main]
 
 jobs:
   verify:
@@ -16,3 +18,4 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - run: npm run smoke

@@ -1,0 +1,32 @@
+{
+  "name": "mira-forge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "node --watch server/index.mjs",
+    "dev:web": "vite",
+    "start": "node server/index.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "npm test && npm run typecheck && npm run build && npm run smoke"
+  },
+  "dependencies": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.0.4",
+    "typescript": "5.9.3",
+    "vite": "7.2.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
