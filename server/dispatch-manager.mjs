@@ -341,6 +341,7 @@ export function createDispatchManager({ store, runners }) {
         const session = (state.sessions ?? []).find((item) => item.id === dispatch.sessionId)
         if (session && ACTIVE_SESSION_STATUSES.includes(session.status)) updateSession(state, session.id, { status: 'disconnected' })
         updateTask(state, batch.id, task.id, { status: 'interrupted' })
+        heartbeatAdapter(state, dispatch.adapterId, { status: 'offline' })
         transitionDispatch(state, dispatch.id, 'interrupted', { signal: 'SIGTERM', error: 'control plane shutdown' })
         dispatchEvent(state, dispatch, 'dispatch.interrupted', { reason: 'control_plane_shutdown' })
         return dispatch

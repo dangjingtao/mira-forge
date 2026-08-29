@@ -131,7 +131,10 @@ test('explicit cancel wins over later child exit callback', async () => {
 
   await manager.cancelDispatch(dispatch.id)
   callbacks.onExit({ code: 0, signal: null, stderr: '', resultText: 'too late' })
-  const state = await waitFor(async () => (await store.read()).dispatches[0]?.status === 'cancelled' && await store.read())
+  const state = await waitFor(async () => {
+    const snapshot = await store.read()
+    return snapshot.dispatches[0]?.status === 'cancelled' ? snapshot : null
+  })
 
   assert.equal(killed, true)
   assert.equal(state.dispatches[0].status, 'cancelled')
@@ -160,5 +163,30 @@ test('startup reconciliation invalidates supervision claims from an older proces
   assert.equal(state.dispatches[0].status, 'interrupted')
   assert.equal(state.sessions[0].status, 'disconnected')
   assert.equal(state.batches[0].tasks[0].status, 'interrupted')
+  assert.equal(state.adapters[0].status, 'offline')
   assert.equal(state.events.at(-1).data.reason, 'control_plane_restart')
+})
+
+test('normal control-plane shutdown interrupts the child and clears busy adapter state', async () => {
+  const { store, batchId } = await fixture()
+  let killed = false
+  const runner = {
+    start(input) {
+      queueMicrotask(() => input.onStarted({ pid: 505 }))
+      return { kill: () => { killed = true; return true } }
+    },
+  }
+  const manager = createDispatchManager({ store, runners: new Map([[OPENCODE_ADAPTER_ID, runner]]) })
+  await manager.dispatchTask({ batchId, taskId: 'T009', prompt: 'Keep running until shutdown' })
+  await waitFor(async () => (await store.read()).dispatches[0]?.status === 'running')
+
+  await manager.shutdown()
+  const state = await store.read()
+
+  assert.equal(killed, true)
+  assert.equal(state.dispatches[0].status, 'interrupted')
+  assert.equal(state.sessions[0].status, 'disconnected')
+  assert.equal(state.batches[0].tasks[0].status, 'interrupted')
+  assert.equal(state.adapters[0].status, 'offline')
+  assert.equal(state.events.at(-1).data.reason, 'control_plane_shutdown')
 })
