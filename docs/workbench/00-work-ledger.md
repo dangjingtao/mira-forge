@@ -9,6 +9,6 @@
 | T005 | Adapter registry and heartbeat | PASS | Provider-neutral registry + heartbeat + legacy-state compatibility; Verify #25 |
 | T006 | Agent session lifecycle | PASS | Durable role-bound session lifecycle + transition/API smoke; Verify #26 |
 | T007 | SHA-bound review handoff history | PASS | Immutable review history + SHA invalidation + anti-forgery smoke; Verify #27 |
-| T008 | Dispatch readiness and dependency gate | DOING | Implementation under verification |
+| T008 | Dispatch readiness and dependency gate | PASS | Dependency validation + active-session gate + readiness API smoke; Verify #28 |
 
 `PASS` means the task acceptance is implemented and the current `dev` baseline has repository verification evidence. Integration into `main` remains a separate decision.

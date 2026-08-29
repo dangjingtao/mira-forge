@@ -2,21 +2,29 @@
 
 Local AI Engineering Orchestrator.
 
-Mira Forge is an experimental global local control plane for coordinating coding agents, durable task state, review handoff, and lightweight progress visibility across multiple repositories.
+Mira Forge is an experimental global local control plane for coordinating coding agents, durable runtime state, SHA-bound review handoff, dispatch readiness, and lightweight progress visibility across multiple repositories.
 
-## First-wave status
+## Current status
 
-Implemented on `dev`:
+Stable first wave on `main`:
 
 - one local control service on `127.0.0.1:47831`;
 - durable runtime state under `~/.mira-forge/state.json`;
 - local project registry;
 - Batch / Task runtime API;
 - minimal global progress dashboard;
-- persistence and state-domain tests;
-- GitHub Actions verification.
+- persistence and state-domain verification.
 
-Builder and reviewer adapters are deliberately not part of this first wave.
+Second wave implemented and verified on `dev`:
+
+- provider-neutral Builder / Reviewer / Git adapter registry and heartbeat;
+- durable Builder / Reviewer session lifecycle;
+- immutable SHA-bound review handoff history;
+- invalidation of stale review passes when task SHA changes;
+- dependency validation and read-only dispatch readiness;
+- active Builder-session dispatch gate.
+
+Forge still does **not** launch OpenCode, Codex, Pi Agent or another Builder/Reviewer itself. Those integrations belong behind adapters in a later milestone.
 
 ## Run locally
 
@@ -47,16 +55,34 @@ Then open `http://127.0.0.1:47831`.
 npm run check
 ```
 
-## Minimal API
+Verification runs unit/domain tests, TypeScript checking, dashboard build, the control-plane smoke, and the dispatch-readiness smoke.
+
+## Runtime API
 
 ```text
 GET   /api/health
 GET   /api/state
+GET   /api/meta
+
 GET   /api/projects
 POST  /api/projects
+
 GET   /api/batches
 POST  /api/batches
 PATCH /api/batches/:batchId/tasks/:taskId
+GET   /api/batches/:batchId/dispatch-ready
+
+GET   /api/adapters
+POST  /api/adapters
+POST  /api/adapters/:adapterId/heartbeat
+
+GET   /api/sessions
+POST  /api/sessions
+PATCH /api/sessions/:sessionId
+
+GET   /api/reviews
+POST  /api/reviews
+POST  /api/reviews/:reviewId/result
 ```
 
 Example project registration:
@@ -76,7 +102,7 @@ curl -X POST http://127.0.0.1:47831/api/projects \
 
 Managed repositories keep their own product/task truth, for example `TODO → DOING → REVIEW → PASS`.
 
-Forge only keeps runtime engineering facts such as:
+Forge keeps runtime engineering facts such as:
 
 ```text
 waiting
@@ -90,9 +116,11 @@ review_passed
 integrated
 ```
 
+Adapters, sessions and review handoffs are runtime evidence, not a replacement requirement system. Review PASS is only actionable for the exact SHA that was handed to the reviewer. Dispatch readiness is read-only and does not start an agent.
+
 See `docs/architecture.md` and `docs/workbench/00-work-ledger.md`.
 
 ## Branches
 
 - `main`: stable baseline
-- `dev`: active development
+- `dev`: active development and integration

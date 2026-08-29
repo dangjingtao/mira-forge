@@ -1,6 +1,6 @@
 # T008 — Dispatch readiness and dependency gate
 
-Status: DOING
+Status: PASS
 
 ## Goal
 
@@ -29,6 +29,6 @@ Let Forge answer which tasks are safe to dispatch next without yet launching any
 - Policy overrides for dependency satisfaction.
 - Auto-merge or deployment.
 
-## Validation
+## Evidence
 
-Dependency graph tests + active-session gate tests + read-only readiness API smoke + repository Verify.
+Implemented in `server/readiness.mjs` and exposed through `GET /api/batches/:batchId/dispatch-ready`. Dependency graph tests cover missing/self/cyclic references, independent parallel-ready tasks, integrated dependency release, `fixing` readiness and active Builder-session blocking. API smoke verifies invalid batches are rejected before persistence and readiness remains read-only. GitHub Actions Verify #28 passed `test + typecheck + build + smoke` on commit `18b2223e26ea`.
