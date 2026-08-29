@@ -80,6 +80,28 @@ try {
   const healthAfterMalformedHost = await fetch(`${baseUrl}/api/health`)
   if (!healthAfterMalformedHost.ok) throw new Error('Malformed Host request took the control plane offline')
 
+  const adapter = await json(await fetch(`${baseUrl}/api/adapters`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      id: 'smoke-builder',
+      name: 'Smoke Builder',
+      kind: 'builder',
+      capabilities: ['code', 'terminal'],
+    }),
+  }))
+  if (adapter.status !== 'offline') throw new Error('Adapter must not be assumed online at registration')
+
+  const heartbeat = await json(await fetch(`${baseUrl}/api/adapters/${adapter.id}/heartbeat`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'available' }),
+  }))
+  if (heartbeat.status !== 'available' || !heartbeat.lastSeenAt) throw new Error('Adapter heartbeat did not persist')
+
+  const adapters = await json(await fetch(`${baseUrl}/api/adapters`))
+  if (adapters.length !== 1 || adapters[0].id !== adapter.id) throw new Error('Adapter registry is incomplete')
+
   const project = await json(await fetch(`${baseUrl}/api/projects`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -113,7 +135,9 @@ try {
   if (task.status !== 'reviewing' || task.reviewRound !== 1) throw new Error('Task update did not persist')
 
   const state = await json(await fetch(`${baseUrl}/api/state`))
-  if (state.projects.length !== 1 || state.batches.length !== 1) throw new Error('State snapshot is incomplete')
+  if (state.projects.length !== 1 || state.batches.length !== 1 || state.adapters.length !== 1) {
+    throw new Error('State snapshot is incomplete')
+  }
 
   const dashboard = await fetch(`${baseUrl}/`)
   const html = await dashboard.text()

@@ -2,7 +2,17 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 export function createEmptyState() {
-  return { schemaVersion: 1, projects: [], batches: [] }
+  return { schemaVersion: 1, projects: [], batches: [], adapters: [] }
+}
+
+function normalizeState(parsed) {
+  if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.projects) || !Array.isArray(parsed.batches)) {
+    throw new Error('Unsupported or invalid Mira Forge state file')
+  }
+  if (parsed.adapters !== undefined && !Array.isArray(parsed.adapters)) {
+    throw new Error('Unsupported or invalid Mira Forge state file')
+  }
+  return { ...parsed, adapters: parsed.adapters ?? [] }
 }
 
 export function createStore(filePath) {
@@ -11,11 +21,7 @@ export function createStore(filePath) {
   async function read() {
     try {
       const raw = await readFile(filePath, 'utf8')
-      const parsed = JSON.parse(raw)
-      if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.projects) || !Array.isArray(parsed.batches)) {
-        throw new Error('Unsupported or invalid Mira Forge state file')
-      }
-      return parsed
+      return normalizeState(JSON.parse(raw))
     } catch (error) {
       if (error?.code === 'ENOENT') return createEmptyState()
       throw error

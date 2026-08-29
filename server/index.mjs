@@ -4,7 +4,16 @@ import { createServer } from 'node:http'
 import { homedir } from 'node:os'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createBatch, registerProject, TASK_STATUSES, updateTask } from './domain.mjs'
+import {
+  ADAPTER_KINDS,
+  ADAPTER_STATUSES,
+  createBatch,
+  heartbeatAdapter,
+  registerAdapter,
+  registerProject,
+  TASK_STATUSES,
+  updateTask,
+} from './domain.mjs'
 import { createStore } from './store.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -91,8 +100,15 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/api/batches') {
       return sendJson(response, 200, (await store.read()).batches)
     }
+    if (request.method === 'GET' && url.pathname === '/api/adapters') {
+      return sendJson(response, 200, (await store.read()).adapters)
+    }
     if (request.method === 'GET' && url.pathname === '/api/meta') {
-      return sendJson(response, 200, { taskStatuses: TASK_STATUSES })
+      return sendJson(response, 200, {
+        taskStatuses: TASK_STATUSES,
+        adapterKinds: ADAPTER_KINDS,
+        adapterStatuses: ADAPTER_STATUSES,
+      })
     }
     if (request.method === 'POST' && url.pathname === '/api/projects') {
       const body = await readJson(request)
@@ -103,6 +119,19 @@ const server = createServer(async (request, response) => {
       const body = await readJson(request)
       const batch = await store.mutate((state) => createBatch(state, body))
       return sendJson(response, 201, batch)
+    }
+    if (request.method === 'POST' && url.pathname === '/api/adapters') {
+      const body = await readJson(request)
+      const adapter = await store.mutate((state) => registerAdapter(state, body))
+      return sendJson(response, 201, adapter)
+    }
+
+    const heartbeatMatch = url.pathname.match(/^\/api\/adapters\/([^/]+)\/heartbeat$/)
+    if (request.method === 'POST' && heartbeatMatch) {
+      const [, rawAdapterId] = heartbeatMatch
+      const body = await readJson(request)
+      const adapter = await store.mutate((state) => heartbeatAdapter(state, decodeURIComponent(rawAdapterId), body))
+      return sendJson(response, 200, adapter)
     }
 
     const taskMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/tasks\/([^/]+)$/)

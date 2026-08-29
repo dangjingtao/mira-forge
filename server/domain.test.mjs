@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createBatch, registerProject, updateTask } from './domain.mjs'
+import { createBatch, heartbeatAdapter, registerAdapter, registerProject, updateTask } from './domain.mjs'
 import { createEmptyState } from './store.mjs'
 
 test('project, batch and task runtime state form the minimal pipeline', () => {
@@ -55,5 +55,41 @@ test('explicit duplicate batch ids are rejected', () => {
   assert.throws(
     () => createBatch(state, { id: 'B-fixed', projectId: project.id, tasks: [{ id: 'T002' }] }),
     /duplicate batch id: B-fixed/,
+  )
+})
+
+test('adapter registry is provider-neutral and heartbeat updates liveness', () => {
+  const state = createEmptyState()
+  const adapter = registerAdapter(state, {
+    id: 'builder-local',
+    name: 'Local Builder',
+    kind: 'builder',
+    capabilities: ['code', 'terminal', 'code'],
+  })
+
+  assert.equal(adapter.status, 'offline')
+  assert.deepEqual(adapter.capabilities, ['code', 'terminal'])
+  assert.equal(adapter.lastSeenAt, null)
+
+  const heartbeated = heartbeatAdapter(state, adapter.id, { status: 'busy' })
+  assert.equal(heartbeated.status, 'busy')
+  assert.ok(heartbeated.lastSeenAt)
+})
+
+test('adapter registry rejects duplicate ids and unknown kinds/statuses', () => {
+  const state = createEmptyState()
+  registerAdapter(state, { id: 'reviewer-local', name: 'Reviewer', kind: 'reviewer' })
+
+  assert.throws(
+    () => registerAdapter(state, { id: 'reviewer-local', name: 'Duplicate', kind: 'reviewer' }),
+    /duplicate adapter id/,
+  )
+  assert.throws(
+    () => registerAdapter(state, { name: 'Unknown', kind: 'browser' }),
+    /invalid adapter kind/,
+  )
+  assert.throws(
+    () => heartbeatAdapter(state, 'reviewer-local', { status: 'sleeping' }),
+    /invalid adapter status/,
   )
 })

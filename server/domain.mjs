@@ -12,6 +12,9 @@ export const TASK_STATUSES = [
   'integrated',
 ]
 
+export const ADAPTER_KINDS = ['builder', 'reviewer', 'git']
+export const ADAPTER_STATUSES = ['available', 'busy', 'offline', 'error']
+
 function now() {
   return new Date().toISOString()
 }
@@ -19,6 +22,33 @@ function now() {
 function requiredString(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`)
   return value.trim()
+}
+
+function stringList(value, name) {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error(`${name} must be an array`)
+  const items = value.map((item) => requiredString(item, `${name} item`))
+  return [...new Set(items)]
+}
+
+function adapters(state) {
+  if (!Array.isArray(state.adapters)) state.adapters = []
+  return state.adapters
+}
+
+function nextAdapterId(state, inputId) {
+  const current = adapters(state)
+  const explicitId = typeof inputId === 'string' ? inputId.trim() : ''
+  if (explicitId) {
+    if (current.some((adapter) => adapter.id === explicitId)) throw new Error(`duplicate adapter id: ${explicitId}`)
+    return explicitId
+  }
+
+  let id
+  do {
+    id = randomUUID()
+  } while (current.some((adapter) => adapter.id === id))
+  return id
 }
 
 function nextBatchId(state, inputId) {
@@ -33,6 +63,42 @@ function nextBatchId(state, inputId) {
     id = `B-${randomUUID().slice(0, 8)}`
   } while (state.batches.some((batch) => batch.id === id))
   return id
+}
+
+export function registerAdapter(state, input) {
+  const kind = requiredString(input.kind, 'kind')
+  if (!ADAPTER_KINDS.includes(kind)) throw new Error(`invalid adapter kind: ${kind}`)
+
+  const status = input.status === undefined ? 'offline' : requiredString(input.status, 'status')
+  if (!ADAPTER_STATUSES.includes(status)) throw new Error(`invalid adapter status: ${status}`)
+
+  const timestamp = now()
+  const adapter = {
+    id: nextAdapterId(state, input.id),
+    name: requiredString(input.name, 'name'),
+    kind,
+    capabilities: stringList(input.capabilities, 'capabilities'),
+    status,
+    lastSeenAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  adapters(state).push(adapter)
+  return adapter
+}
+
+export function heartbeatAdapter(state, adapterId, input = {}) {
+  const adapter = adapters(state).find((item) => item.id === adapterId)
+  if (!adapter) throw new Error('adapter not found')
+
+  const status = input.status === undefined ? 'available' : requiredString(input.status, 'status')
+  if (!ADAPTER_STATUSES.includes(status)) throw new Error(`invalid adapter status: ${status}`)
+
+  const timestamp = now()
+  adapter.status = status
+  adapter.lastSeenAt = timestamp
+  adapter.updatedAt = timestamp
+  return adapter
 }
 
 export function registerProject(state, input) {
