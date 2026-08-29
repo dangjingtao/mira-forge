@@ -30,6 +30,8 @@ async function probeMalformedHost(port) {
     const socket = createConnection({ host: '127.0.0.1', port }, () => {
       socket.end('GET /api/health HTTP/1.1\r\nHost: [\r\nConnection: close\r\n\r\n')
     })
+    socket.resume()
+    socket.setTimeout(1000, () => socket.destroy())
     socket.on('error', () => resolvePromise())
     socket.on('close', () => resolvePromise())
   })
