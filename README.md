@@ -19,7 +19,7 @@ Second wave implemented and verified on `dev`:
 
 - provider-neutral Builder / Reviewer / Git adapter registry and heartbeat;
 - durable Builder / Reviewer session lifecycle;
-- immutable SHA-bound review handoff history;
+- durable SHA-bound review handoff history;
 - invalidation of stale review passes when task SHA changes;
 - dependency validation and read-only dispatch readiness;
 - active Builder-session dispatch gate.
