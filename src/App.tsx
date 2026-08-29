@@ -1,199 +1,31 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-type Project = {
-  id: string
-  name: string
-  rootPath: string
-  repository: string | null
-  integrationBranch: string
-}
+type Project = { id: string; name: string; rootPath: string; repository: string | null; integrationBranch: string }
+type Task = { id: string; title: string; status: string; builder: string | null; reviewRound: number }
+type Batch = { id: string; projectId: string; name: string; status: string; tasks: Task[] }
+type ForgeState = { schemaVersion: number; projects: Project[]; batches: Batch[] }
 
-type Task = {
-  id: string
-  title: string
-  status: string
-  builder: string | null
-  reviewRound: number
-  dependsOn: string[]
-}
-
-type Batch = {
-  id: string
-  projectId: string
-  name: string
-  status: string
-  tasks: Task[]
-}
-
-type ForgeState = {
-  schemaVersion: number
-  projects: Project[]
-  batches: Batch[]
-}
-
-const statusLabels: Record<string, string> = {
-  waiting: '等待',
-  building: '施工中',
-  reviewing: '评审中',
-  fixing: '整改中',
-  waiting_integration: '待集成',
-  interrupted: '已中断',
-  stale: '已失效',
-  review_passed: '评审通过',
-  integrated: '已集成',
-}
+const statusLabels: Record<string, string> = { waiting: 'waiting', building: 'building', reviewing: 'reviewing', fixing: 'fixing', waiting_integration: 'waiting integration', interrupted: 'interrupted', stale: 'stale', review_passed: 'review passed', integrated: 'integrated' }
 
 function App() {
   const [state, setState] = useState<ForgeState | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-
-  const load = useCallback(async () => {
-    try {
-      const response = await fetch('/api/state')
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      setState(await response.json())
-      setError('')
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => void load(), 2000)
-    return () => window.clearInterval(timer)
-  }, [load])
-
-  const taskStats = useMemo(() => {
-    const tasks = state?.batches.flatMap((batch) => batch.tasks) ?? []
-    return {
-      total: tasks.length,
-      active: tasks.filter((task) => ['building', 'fixing'].includes(task.status)).length,
-      reviewing: tasks.filter((task) => task.status === 'reviewing').length,
-      passed: tasks.filter((task) => ['review_passed', 'waiting_integration', 'integrated'].includes(task.status)).length,
-    }
-  }, [state])
-
-  async function register(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    setSaving(true)
-    try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name: form.get('name'),
-          rootPath: form.get('rootPath'),
-          repository: form.get('repository'),
-          integrationBranch: form.get('integrationBranch'),
-        }),
-      })
-      if (!response.ok) {
-        const body = await response.json()
-        throw new Error(body.message || `HTTP ${response.status}`)
-      }
-      event.currentTarget.reset()
-      await load()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <main className="shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">LOCAL AI ENGINEERING ORCHESTRATOR</p>
-          <h1>Mira Forge</h1>
-          <p className="lede">一个全局本地的 AI 工程调度室。项目可以很多，施工工具可以很多，工程状态只有一份。</p>
-        </div>
-        <button className="ghost" onClick={() => void load()}>刷新</button>
-      </header>
-
-      {error && <div className="notice">连接控制服务失败：{error}</div>}
-
-      <section className="metrics" aria-label="施工概况">
-        <Metric label="项目" value={state?.projects.length ?? 0} />
-        <Metric label="任务" value={taskStats.total} />
-        <Metric label="施工" value={taskStats.active} />
-        <Metric label="评审" value={taskStats.reviewing} />
-        <Metric label="通过" value={taskStats.passed} />
-      </section>
-
-      <section className="panel register-panel">
-        <div>
-          <p className="section-kicker">PROJECT REGISTRY</p>
-          <h2>注册本地项目</h2>
-          <p>这里只保存 Forge 的运行入口，不复制项目里的任务事实。</p>
-        </div>
-        <form onSubmit={register}>
-          <input name="name" placeholder="项目名，例如 Com Design Prototype" required />
-          <input name="rootPath" placeholder="本地路径，例如 /Users/tomz/code/project" required />
-          <input name="repository" placeholder="GitHub 仓库（可选）" />
-          <input name="integrationBranch" placeholder="集成分支" defaultValue="dev" />
-          <button type="submit" disabled={saving}>{saving ? '注册中…' : '注册项目'}</button>
-        </form>
-      </section>
-
-      <section className="projects">
-        {(state?.projects ?? []).map((project) => {
-          const batches = state?.batches.filter((batch) => batch.projectId === project.id) ?? []
-          return (
-            <article className="panel project" key={project.id}>
-              <div className="project-head">
-                <div>
-                  <p className="section-kicker">{project.integrationBranch}</p>
-                  <h2>{project.name}</h2>
-                  <code>{project.rootPath}</code>
-                </div>
-                <span className="count">{batches.length} batches</span>
-              </div>
-
-              {batches.length === 0 ? (
-                <div className="empty">还没有 Batch。下一波接入 Dispatch 后，这里会自动出现施工波次。</div>
-              ) : batches.map((batch) => (
-                <div className="batch" key={batch.id}>
-                  <div className="batch-title"><strong>{batch.name}</strong><span>{batch.status}</span></div>
-                  <div className="task-list">
-                    {batch.tasks.map((task) => <TaskRow key={task.id} task={task} />)}
-                  </div>
-                </div>
-              ))}
-            </article>
-          )
-        })}
-
-        {state && state.projects.length === 0 && (
-          <div className="panel empty big-empty">
-            <strong>工地还是空的。</strong>
-            <span>先注册一个本地项目。之后 Dispatch / OpenCode / Codex 都只更新这里的运行状态。</span>
-          </div>
-        )}
-      </section>
-    </main>
-  )
+  const [activeProject, setActiveProject] = useState(0)
+  const [registering, setRegistering] = useState(false)
+  const [palette, setPalette] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const load = useCallback(async () => { try { const response = await fetch('/api/state'); if (!response.ok) throw new Error(`HTTP ${response.status}`); setState(await response.json()); setError('') } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) } }, [])
+  useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 2000); return () => window.clearInterval(timer) }, [load])
+  useEffect(() => { if (registering) window.setTimeout(() => nameRef.current?.focus(), 0) }, [registering])
+  const projects = state?.projects ?? []
+  const selected = projects[activeProject]
+  const batches = selected ? (state?.batches.filter((batch) => batch.projectId === selected.id) ?? []) : []
+  const stats = useMemo(() => { const tasks = state?.batches.flatMap((batch) => batch.tasks) ?? []; return { total: tasks.length, active: tasks.filter((task) => ['building', 'fixing'].includes(task.status)).length, reviewing: tasks.filter((task) => task.status === 'reviewing').length, passed: tasks.filter((task) => ['review_passed', 'waiting_integration', 'integrated'].includes(task.status)).length } }, [state])
+  useEffect(() => { function onKey(event: KeyboardEvent) { const target = event.target as HTMLElement; const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName); if (event.key === 'Escape') { setPalette(false); setRegistering(false); return } if (typing) return; if (event.key === 'j' || event.key === 'ArrowDown') { event.preventDefault(); setActiveProject((index) => Math.min(index + 1, Math.max(projects.length - 1, 0))) } if (event.key === 'k' || event.key === 'ArrowUp') { event.preventDefault(); setActiveProject((index) => Math.max(index - 1, 0)) } if (event.key === 'r') { event.preventDefault(); void load() } if (event.key === 'n') { event.preventDefault(); setRegistering(true) } if (event.key === '/') { event.preventDefault(); setPalette(true) } if (event.key === 'q') { event.preventDefault(); setPalette(false); setRegistering(false) } } window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [load, projects.length])
+  async function register(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); setSaving(true); try { const response = await fetch('/api/projects', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: form.get('name'), rootPath: form.get('rootPath'), repository: form.get('repository'), integrationBranch: form.get('integrationBranch') }) }); if (!response.ok) { const body = await response.json(); throw new Error(body.message || `HTTP ${response.status}`) }; event.currentTarget.reset(); setRegistering(false); await load() } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) } finally { setSaving(false) } }
+  return <main className="forge-tui"><header className="topbar"><span className="brand">MIRA FORGE</span><span className="crumb">/ control plane / {selected?.name ?? 'workspace'}</span><span className="connection"><i /> LOCAL · LIVE</span></header><div className="workspace"><aside className="sidebar" aria-label="project navigator"><div className="side-title">WORKSPACES <span>{projects.length}</span></div><div className="project-list">{projects.map((project, index) => <button key={project.id} className={`project-item ${index === activeProject ? 'selected' : ''}`} onClick={() => setActiveProject(index)}><span className="cursor">{index === activeProject ? '›' : ' '}</span><span><strong>{project.name}</strong><small>{project.integrationBranch} · {state?.batches.filter((batch) => batch.projectId === project.id).length ?? 0} batches</small></span></button>)}</div><button className="new-project" onClick={() => setRegistering(true)}><span>+</span> new project <kbd>n</kbd></button><div className="sidebar-foot"><span>v0.1.0</span><span>state: ~/.mira-forge</span></div></aside><section className="main-pane"><div className="pane-head"><div><span className="eyebrow">PROJECT STATUS</span><h1>{selected?.name ?? 'empty workspace'}</h1><code>{selected?.rootPath ?? 'No project selected'}</code></div><button className="refresh" onClick={() => void load()} title="Refresh (r)">↻ <kbd>r</kbd></button></div>{error && <div className="error-line">! {error}</div>}{selected ? <><div className="stat-line"><Stat label="tasks" value={stats.total} /><Stat label="building" value={stats.active} /><Stat label="reviewing" value={stats.reviewing} /><Stat label="passed" value={stats.passed} /></div><div className="stream-label">RUNTIME STREAM <span>{batches.length} batches</span></div>{batches.length ? batches.map((batch) => <article className="batch" key={batch.id}><div className="batch-head"><strong>{batch.name}</strong><span>{batch.status}</span></div>{batch.tasks.map((task) => <div className="task" key={task.id}><span className={`status-dot dot-${task.status}`} /><b>{task.id}</b><span className="task-title">{task.title}</span><span className="task-meta">{task.builder || 'unassigned'}{task.reviewRound ? ` · review #${task.reviewRound}` : ''}</span><span className={`task-status status-${task.status}`}>{statusLabels[task.status] || task.status}</span></div>)}</article>) : <div className="empty-stream"><span className="prompt">›</span><div><strong>no runtime events</strong><p>Dispatch will populate this stream when the next wave starts.</p></div></div>}</> : <div className="empty-workspace"><span className="prompt">›</span><div><strong>workspace is empty</strong><p>Press <kbd>n</kbd> to register a local project.</p></div></div>}<footer className="keybar"><span><kbd>j</kbd><kbd>k</kbd> navigate</span><span><kbd>n</kbd> new project</span><span><kbd>/</kbd> commands</span><span><kbd>r</kbd> refresh</span><span><kbd>esc</kbd> close</span></footer></section></div>{registering && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setRegistering(false) }}><form className="register-modal" onSubmit={register}><div className="modal-title">REGISTER PROJECT <kbd>esc</kbd></div><label>name<input ref={nameRef} name="name" placeholder="project name" required /></label><label>root path<input name="rootPath" placeholder="/absolute/path/to/project" required /></label><label>repository <span className="optional">optional</span><input name="repository" placeholder="https://github.com/..." /></label><label>integration branch<input name="integrationBranch" defaultValue="dev" /></label><button type="submit" disabled={saving}>{saving ? 'registering...' : 'register project  ↵'}</button></form></div>}{palette && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPalette(false) }}><div className="command-palette"><div className="modal-title">COMMANDS <kbd>esc</kbd></div><button onClick={() => { setRegistering(true); setPalette(false) }}><kbd>n</kbd><span>new project</span></button><button onClick={() => { void load(); setPalette(false) }}><kbd>r</kbd><span>refresh state</span></button><button onClick={() => setPalette(false)}><kbd>q</kbd><span>close overlay</span></button></div></div>}</main>
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="metric"><span>{label}</span><strong>{value}</strong></div>
-}
-
-function TaskRow({ task }: { task: Task }) {
-  const label = statusLabels[task.status] || task.status
-  return (
-    <div className="task-row">
-      <div className={`dot dot-${task.status}`} />
-      <strong>{task.id}</strong>
-      <span className="task-title">{task.title}</span>
-      <span>{task.builder || '—'}</span>
-      {task.reviewRound > 0 && <span>Review #{task.reviewRound}</span>}
-      <span className="status">{label}</span>
-    </div>
-  )
-}
-
+function Stat({ label, value }: { label: string; value: number }) { return <span className="stat"><b>{value}</b> {label}</span> }
 export default App
