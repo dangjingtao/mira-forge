@@ -6,10 +6,6 @@ Status: REVIEW
 
 Expose the first real Builder dispatch in the keyboard-first Mira Forge control surface without replacing or restyling the current TUI direction.
 
-## Unblocked baseline
-
-The keyboard-first UI source is now present on remote `dev` at `3d744e301416` and was merged into `feat/dispatch-opencode` before T012 implementation. The task no longer relies on the stale pre-TUI dashboard source.
-
 ## Acceptance
 
 - Preserve the existing keyboard-first region model and visual direction.
@@ -22,26 +18,14 @@ The keyboard-first UI source is now present on remote `dev` at `3d744e301416` an
 - Mouse support exists, while task selection / dispatch / cancel remain keyboard-reachable.
 - The first-use UI reflects the serial Builder policy and displays which task currently owns `opencode-local`.
 
-## Dependencies
-
-- T009 — PASS.
-- T010 — REVIEW pending real local OpenCode acceptance.
-- T011 — PASS.
-- Keyboard-first TUI source — available on `dev@3d744e301416`.
-
-## Out of scope
-
-- UI redesign.
-- Automatic Reviewer dispatch.
-- Parallel scheduler UI/worktree management.
-- Requirement/task ingestion from a managed project's ledger.
-
 ## Repository evidence
 
-Implemented in `src/App.tsx` and `src/styles.css` on `feat/dispatch-opencode`. Task rows are focusable/selectable, `d` opens an explicit dispatch form, `x` opens cancel confirmation, the command palette exposes the same actions, and the runtime surface renders durable dispatch events. The UI checks authoritative dispatch readiness before opening the dispatch form and reflects the stricter single-active-Builder execution policy.
+Implemented in `src/App.tsx` and `src/styles.css`. Task rows are focusable/selectable, `d` opens an explicit dispatch form, `x` opens cancel confirmation, the command palette exposes the same actions, and the runtime surface renders durable dispatch events. The UI checks authoritative dispatch readiness before opening the dispatch form and reflects the stricter single-active-Builder execution policy.
 
-Verify #57 passed `test + typecheck + build + smoke` after the TUI wiring and the action-error persistence fix.
+The backend dispatch/cancel paths, duplicate/serial gates, late callbacks and runtime evidence are automated in unit/smoke coverage. Users must not be asked to recreate those cases manually.
 
 ## Remaining acceptance
 
-Run one harmless task through the UI with the user's actual locally installed `opencode` binary and verify the live event sequence plus explicit cancel. Until that machine-level check is completed, T012 remains `REVIEW`.
+T012 is non-blocking for first use. Do **not** manufacture a disposable real project task merely to prove the UI.
+
+The first normal project task the user actually dispatches through Forge is the observational acceptance: selection remains stable, the explicit Dispatch surface opens, runtime evidence appears, and the task lands in the expected terminal/review state. Explicit cancel can be accepted when naturally exercised; its process/state race contract is already automated.
