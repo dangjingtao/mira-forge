@@ -1,6 +1,6 @@
 import { once } from 'node:events'
 import { mkdtemp } from 'node:fs/promises'
-import { createServer } from 'node:net'
+import { createConnection, createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -23,6 +23,16 @@ async function reservePort() {
   const port = typeof address === 'object' && address ? address.port : 0
   await new Promise((resolvePromise) => probe.close(resolvePromise))
   return port
+}
+
+async function probeMalformedHost(port) {
+  await new Promise((resolvePromise) => {
+    const socket = createConnection({ host: '127.0.0.1', port }, () => {
+      socket.end('GET /api/health HTTP/1.1\r\nHost: [\r\nConnection: close\r\n\r\n')
+    })
+    socket.on('error', () => resolvePromise())
+    socket.on('close', () => resolvePromise())
+  })
 }
 
 async function json(response) {
@@ -62,6 +72,11 @@ try {
     await sleep(100)
   }
   if (!healthy) throw new Error(`Forge did not become healthy.\n${logs}`)
+
+  await probeMalformedHost(port)
+  await sleep(50)
+  const healthAfterMalformedHost = await fetch(`${baseUrl}/api/health`)
+  if (!healthAfterMalformedHost.ok) throw new Error('Malformed Host request took the control plane offline')
 
   const project = await json(await fetch(`${baseUrl}/api/projects`, {
     method: 'POST',
