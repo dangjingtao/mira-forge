@@ -41,6 +41,20 @@ The target is not a large "professional-looking" dashboard. The interface should
 
 Use the repository/current Mira visual source if a canonical primary color is already available at implementation time. Do not guess a new brand color when a real token/source can be read.
 
+## Visual Smoke Follow-up
+
+Human visual smoke found that the compact direction is broadly correct, but the first pass uses the Mira orange too frequently. Refine the surface with Claude Code-style restraint as a reference principle, not as a pixel-for-pixel copy.
+
+- Treat Mira orange as a scarce accent, not the default structural color.
+- Keep `#FA7328` for selected/current focus, keyboard focus, a small number of primary/active actions, and occasional high-value emphasis.
+- Return ordinary borders, separators, passive icons, secondary buttons, inactive labels and most panel chrome to neutral gray/brown-black tokens.
+- Keep semantic states semantic: success green, warning/attention yellow, destructive/error red; do not make every state orange.
+- Prefer hierarchy from typography, spacing, alignment and surface contrast before adding accent color.
+- Avoid combinations of orange text + orange border + orange background on the same ordinary control.
+- Main Thread collapse control should use `−` when expanded and `+` when collapsed. Do not use directional arrows for this action because they read as movement/scroll controls.
+
+The intended result is a mostly neutral engineering workbench with Mira orange used as a precise identity/focus signal.
+
 ## Hard Constraints
 
 - Do not remove keyboard-first interaction merely to simplify styling.
@@ -49,12 +63,15 @@ Use the repository/current Mira visual source if a canonical primary color is al
 - Do not add gratuitous animation.
 - Do not change task/runtime contracts owned by T014-T016.
 - Do not introduce mixed Chinese/English product copy; visible UI is English-only.
+- Do not remove the Mira primary color entirely; reduce its coverage and improve its role.
 
 ## Execution Entry Points
 
 - `src/App.tsx`
 - `src/styles.css`
 - `src/main.tsx`
+- `src/MainThreadPanel.tsx`
+- `src/main-thread.css`
 - `src/FirstRunCheck.tsx`
 - `src/acceptance.css`
 - focused new UI components/styles created by T015
@@ -62,6 +79,8 @@ Use the repository/current Mira visual source if a canonical primary color is al
 ## Acceptance
 
 - Mira primary accent is consistently used for selection, active/focus and important status emphasis without overwhelming the screen.
+- Most structural UI is neutral; orange is visibly sparse and intentional rather than repeated across borders, labels and controls.
+- Main Thread collapse/expand control uses `− / +` with unambiguous behavior.
 - Major page regions are visibly denser than the current implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
 - Main thread, project/task/thread navigation and runtime information can coexist on a normal laptop viewport without unnecessary scrolling caused by decorative spacing.
 - All visible product UI text is English.
@@ -78,7 +97,8 @@ Use the repository/current Mira visual source if a canonical primary color is al
 - Existing project/task keyboard interactions, thread actions, dispatch/cancel contracts and provider/runtime APIs were not changed.
 - The current `dev` choice to leave the First-run Check launcher entry unmounted is preserved; its dormant UI remains styled and the remaining Chinese diagnostic label was replaced with English.
 - GitHub Actions Verify run `33363325558` passed on the final PR head. The job passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
-- Automated verification is complete. Visual/browser smoke is still required before changing `REVIEW` to `PASS`, because the acceptance criteria include visual density, hierarchy and coexistence on a laptop viewport.
+- Human visual smoke on 2026-08-31 identified two follow-ups before PASS: orange usage is too broad, and Main Thread collapse/expand arrows should become `− / +`.
+- Automated verification is complete. T017 remains `REVIEW` until the visual follow-up is implemented and visually accepted.
 
 ## Out of Scope
 
@@ -94,4 +114,4 @@ Resolved for T017: the canonical Mira primary was read from the current Mira vis
 
 ## Handoff
 
-T017 implementation is merged and ready for visual smoke. After visual acceptance, mark it PASS. T018 can then add richer live-runtime information inside these regions without reopening T014-T016 runtime contracts.
+T017 remains in visual review. Apply the restrained accent-color pass and `− / +` Main Thread collapse control, rerun automated checks, then repeat the short visual smoke. Only after that acceptance should T017 move to PASS and unblock T018.
