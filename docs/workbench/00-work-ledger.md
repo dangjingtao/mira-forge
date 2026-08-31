@@ -16,11 +16,11 @@
 | T012 | TUI dispatch wiring | REVIEW | Keyboard dispatch/cancel/runtime UI verified in repository; first normal real-project dispatch will close observational acceptance |
 | T013 | One-step First-run Check | PASS | Disposable real-OpenCode diagnostic + API/UI + timeout/session/marker tests + fake-OpenCode E2E; Verify #63 |
 | T014 | Repository-native Task Source Spike | PASS | Repo Markdown inspect/resolve/create/update, workspace bounds, no runtime Task Card copy; Verify #89 |
-| T015 | Main Thread Runtime for Codex and OpenCode | REVIEW | OpenCode two-turn + refresh replay passed; Codex Desktop app-server adapter + optional Codex CLI + live process UI verified in repository; Verify #133; one real Codex Desktop two-turn refresh smoke remains |
-| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | TODO | Depends on T015 PASS; provider-neutral construction-thread adapter expansion |
-| T017 | Compact Mira Web UI | TODO | Depends on T015 PASS; Mira accent, compact restrained layout, English-only UI |
+| T015 | Main Thread Runtime for Codex and OpenCode | PASS | OpenCode two-turn + refresh replay passed; Codex Desktop real two-turn continuation passed after app-server sandbox fix; provider contracts + live process UI verified; Verify #139; UI polish deferred |
+| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | TODO | Unblocked by T015 PASS; provider-neutral construction-thread adapter expansion |
+| T017 | Compact Mira Web UI | TODO | Unblocked by T015 PASS; Mira accent, compact restrained layout, English-only UI; T015 smoke UI findings belong here |
 | T018 | Live Runtime Surface | TODO | Depends on T016 + T017 PASS; compact live agent/task/session/runtime information |
 
 `PASS` means task acceptance is implemented with repository verification evidence. `REVIEW` means implementation exists but a named acceptance step remains. Human acceptance must be limited to facts that repository automation cannot prove (for example a machine-local binary/provider configuration); users should not be asked to recreate batches, internal IDs, API calls, or concurrency regressions merely to validate Forge.
 
-Fourth-wave execution order: T014 first. After T014 passes, T015 starts. T016 and T017 follow T015; they may run in parallel only after confirming their implementation entry points do not create code or contract contention. T018 integrates the resulting runtime and UI surfaces last.
+Fourth-wave execution order: T014 first, then T015. With T015 now PASS, T016 and T017 are unblocked and may run in parallel after confirming their implementation entry points do not create code or contract contention. T018 integrates the resulting runtime and UI surfaces last.
