@@ -98,7 +98,9 @@ The intended result is a mostly neutral engineering workbench with Mira orange u
 - The current `dev` choice to leave the First-run Check launcher entry unmounted is preserved; its dormant UI remains styled and the remaining Chinese diagnostic label was replaced with English.
 - GitHub Actions Verify run `33363325558` passed on the final PR head. The job passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
 - Human visual smoke on 2026-08-31 identified two follow-ups before PASS: orange usage is too broad, and Main Thread collapse/expand arrows should become `− / +`.
-- Automated verification is complete. T017 remains `REVIEW` until the visual follow-up is implemented and visually accepted.
+- Visual restraint follow-up merged to `dev` through PR `#8` at squash commit `c97bfdf597cb7fdc5eb94a85a3829285a0690548`.
+- PR `#8` Verify run `33382968808` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
+- T017 remains `REVIEW` until the merged visual follow-up is visually accepted in the browser.
 
 ## Out of Scope
 
@@ -114,4 +116,4 @@ Resolved for T017: the canonical Mira primary was read from the current Mira vis
 
 ## Handoff
 
-T017 remains in visual review. Apply the restrained accent-color pass and `− / +` Main Thread collapse control, rerun automated checks, then repeat the short visual smoke. Only after that acceptance should T017 move to PASS and unblock T018.
+The visual restraint pass and `− / +` Main Thread collapse control are merged to `dev` and automated checks are green. Repeat the short browser visual smoke; only after human acceptance should T017 move to PASS and unblock T018.
