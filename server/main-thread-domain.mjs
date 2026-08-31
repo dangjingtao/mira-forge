@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-export const MAIN_THREAD_ADAPTERS = ['opencode', 'codex']
+export const MAIN_THREAD_ADAPTERS = ['opencode', 'codex-desktop', 'codex']
 export const MAIN_THREAD_STATUSES = ['idle', 'running', 'error']
 export const MAIN_THREAD_EVENT_TYPES = ['message', 'thinking', 'tool', 'status', 'artifact', 'handoff']
 
