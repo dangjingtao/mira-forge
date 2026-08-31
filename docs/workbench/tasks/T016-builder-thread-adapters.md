@@ -75,9 +75,9 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - First-use serial safety is preserved globally across the three built-in choices. Adding PiAgent/Codex does not create simultaneous write lanes into an unmanaged working tree. Parallel Builders remain blocked until a scheduler/worktree contract explicitly replaces this guard.
 - Successful execution still moves the Task only to `reviewing`. Cancellation, restart reconciliation and shutdown remain owned by the existing Forge process-supervision path.
 - `/api/meta` exposes the product-level Builder choices and built-in adapter IDs.
-- PR #9 closes the Web product-surface gap. `src/App.tsx` now reads the product-level Builder choices and presents `OpenCode`, `PiAgent`, and `Codex` in the real dispatch modal, then posts the `builder` contract rather than a hard-wired `opencode-local` adapter ID.
+- PR #9 closes the Web product-surface gap. `src/App.tsx` reads the product-level Builder choices and presents `OpenCode`, `PiAgent`, and `Codex` in the real dispatch modal, then posts the `builder` contract rather than a hard-wired `opencode-local` adapter ID.
 - PR #9 also exposes repository Task Source → runtime Batch creation in the Web UI. The server reuses T014's repository Markdown task source, validates task ledger/task directory configuration before persisting it, resolves the exact Task Card filename/ref, and creates runtime Batch entries without copying Task Card content into durable Forge state.
-- The UI global serial guard now treats any active Builder dispatch as the occupied construction lane, independent of provider.
+- The UI global serial guard treats any active Builder dispatch as the occupied construction lane, independent of provider.
 - T016 UI additions follow the accepted T017 tokens: structural controls are neutral (`surface/panel/line/text`), semantic states retain semantic colors, and Mira orange is reserved for selection/focus/rare active emphasis.
 
 ## Deterministic Verification
@@ -98,11 +98,11 @@ Repository tests cover:
 - validated task-source configuration before persistence;
 - repository Task selection → runtime Batch creation and duplicate active-task rejection.
 
-Verify #157 passed on PR #6 with `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`. PR #9 then added the real product-loop UI/task-source path; Verify #178 passed the same repository gate before final cosmetic follow-up. A fresh final PR-head Verify is required before merge.
+Verify #157 passed on PR #6 with `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`. PR #9 added the real product-loop UI/task-source path and was squash-merged to `dev` at `7d332b5a07e27c63502d6cc17e4c9e40026e36d6` after final PR-head Verify #181 passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
 
 ## Human Product-loop Acceptance
 
-T016 is still not accepted. The previous OpenCode-only UI blocker has been implemented in PR #9; the remaining acceptance fact is machine-local and must be observed by a human on the user's Mac.
+T016 is still not accepted. The previous OpenCode-only UI blocker is merged; the remaining acceptance fact is machine-local and must be observed by a human on the user's Mac.
 
 Required observed loop:
 
@@ -157,4 +157,4 @@ MIRA_FORGE_CODEX_DESKTOP_BUILDER_BIN=/path/to/codex node scripts/builder-adapter
 
 ## Handoff
 
-T016 remains REVIEW. The provider-neutral Builder implementation and the Web product-loop entry points are present in PR #9. After the final PR-head Verify is green, merge the candidate and perform one human Mac PiAgent or Codex dispatch through Forge. Only that completed end-to-end observation may return T016 to PASS.
+T016 remains REVIEW. The provider-neutral Builder implementation and the Web product-loop entry points from PR #9 are merged to `dev` and Verify #181 is green. The next action is one human Mac PiAgent or Codex dispatch through Forge; only that completed end-to-end observation may return T016 to PASS.
