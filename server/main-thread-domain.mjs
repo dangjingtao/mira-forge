@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 export const MAIN_THREAD_ADAPTERS = ['opencode', 'codex']
 export const MAIN_THREAD_STATUSES = ['idle', 'running', 'error']
-export const MAIN_THREAD_EVENT_TYPES = ['message', 'tool', 'status', 'artifact', 'handoff']
+export const MAIN_THREAD_EVENT_TYPES = ['message', 'thinking', 'tool', 'status', 'artifact', 'handoff']
 
 function now() {
   return new Date().toISOString()
