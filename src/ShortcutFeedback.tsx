@@ -2,17 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 
 const feedbackStyle = {
   position: 'fixed' as const,
-  right: 18,
-  bottom: 56,
-  zIndex: 9,
-  padding: '7px 10px',
-  border: '1px solid #28313d',
-  background: '#11161d',
-  color: '#a3d977',
+  left: '50%',
+  bottom: 12,
+  zIndex: 19,
+  padding: '6px 9px',
+  border: '1px solid rgba(250, 115, 40, .28)',
+  borderRadius: 4,
+  background: '#151210',
+  color: '#fa7328',
   fontFamily: '"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace',
-  fontSize: 10,
-  letterSpacing: '.04em',
+  fontSize: 9,
+  letterSpacing: '.03em',
   pointerEvents: 'none' as const,
+  transform: 'translateX(-50%)',
 }
 
 function ShortcutFeedback() {
