@@ -15,5 +15,12 @@
 | T011 | Process supervision and runtime events | PASS | Success/failure/cancel/restart/shutdown supervision tests + dispatch smoke; Verify #51 |
 | T012 | TUI dispatch wiring | REVIEW | Keyboard dispatch/cancel/runtime UI verified in repository; first normal real-project dispatch will close observational acceptance |
 | T013 | One-step First-run Check | PASS | Disposable real-OpenCode diagnostic + API/UI + timeout/session/marker tests + fake-OpenCode E2E; Verify #63 |
+| T014 | Repository-native Task Source Spike | TODO | Validate repo Markdown ledger/Task Card as authoritative task truth before expanding the product flow |
+| T015 | Main Thread Runtime for Codex and OpenCode | TODO | Depends on T014 PASS; durable main/dispatch thread + Task Card handoff |
+| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | TODO | Depends on T015 PASS; provider-neutral construction-thread adapter expansion |
+| T017 | Compact Mira Web UI | TODO | Depends on T015 PASS; Mira accent, compact restrained layout, English-only UI |
+| T018 | Live Runtime Surface | TODO | Depends on T016 + T017 PASS; compact live agent/task/session/runtime information |
 
 `PASS` means task acceptance is implemented with repository verification evidence. `REVIEW` means implementation exists but a named acceptance step remains. Human acceptance must be limited to facts that repository automation cannot prove (for example a machine-local binary/provider configuration); users should not be asked to recreate batches, internal IDs, API calls, or concurrency regressions merely to validate Forge.
+
+Fourth-wave execution order: T014 first. After T014 passes, T015 starts. T016 and T017 follow T015; they may run in parallel only after confirming their implementation entry points do not create code or contract contention. T018 integrates the resulting runtime and UI surfaces last.
