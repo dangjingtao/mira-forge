@@ -21,6 +21,12 @@ Managed Projects / Task Cards
    |             Process Runner
    |                 |
    |          OpenCode local adapter
+   |
+   +-- Main Threads -- Thread Events
+   |       |             |
+   |   Codex/OpenCode    +-- message/tool/status/artifact/handoff
+   |       |
+   |       +-- explicit Task Source capabilities
    \
     Dispatch Readiness (read-only)
 ```
@@ -63,7 +69,7 @@ Task-source reads and writes are bounded to the registered project root, includi
 
 The normalized task-source result is a reference surface (`id`, title/status index data, `taskRef`, `ledgerRef`, bounded warnings), not another requirements database. Full Task Card content is never copied into `~/.mira-forge/state.json` by this contract. Runtime batches/tasks remain execution bindings rather than authoritative requirement records.
 
-T014 intentionally does not add a public HTTP task-management API. T015 consumes this module boundary from the main-thread runtime so the product flow can stabilize before another API surface is exposed.
+T014 intentionally kept the task source as a module boundary. T015 now consumes that boundary from the main-thread runtime and exposes only explicit thread-scoped task capabilities; the Task Card body still remains repository truth.
 
 ## Durable runtime collections
 
@@ -81,11 +87,32 @@ Schema version 1 contains additive collections for:
 - `sessions`: durable Builder / Reviewer execution-session history;
 - `reviews`: SHA-bound review-handoff history;
 - `dispatches`: durable Builder dispatch attempts and bounded terminal evidence;
-- `events`: append-only runtime milestones used by the control surface.
+- `events`: append-only Builder/runtime milestones used by the control surface;
+- `threads`: durable project main/dispatch conversations, separate from Builder/Reviewer sessions;
+- `threadEvents`: bounded normalized `message / tool / status / artifact / handoff` history.
 
 Older schema-1 files that do not contain later additive arrays remain readable.
 
 The server writes through a temporary file and rename, and serializes in-process mutations, so a dashboard refresh, Vite restart or reviewer disconnect does not become the state boundary.
+
+## Main thread boundary
+
+A main thread is a durable project conversation for discussion, inspection, planning, Task Card operations and dispatch decisions. It is deliberately not a Builder session.
+
+The provider-neutral minimum contract is:
+
+- one registered project;
+- one `codex` or `opencode` adapter selection;
+- durable user/assistant messages plus bounded normalized provider events;
+- an external provider thread/session ID when the provider supports durable continuation;
+- explicit repository-task capabilities implemented through `server/repo-task-source.mjs`;
+- explicit dispatch handoff containing only `projectId + taskId + taskRef + preferredBuilder`.
+
+OpenCode main threads run with the `plan` agent and a runtime permission override that denies everything by default while allowing read-oriented inspection tools. Codex main threads run through `codex exec --json` with `--sandbox read-only --ask-for-approval never`. A Codex resume must report the exact requested thread ID; a different ID is treated as failure rather than silently accepting a new conversation. Provider-reported file changes are also treated as a main-thread contract violation.
+
+Task-source writes and dispatch handoffs are separate explicit Forge capabilities. A model response cannot create a Task Card or launch a Builder merely by mentioning one. Handoff creation records a reference event only; existing dispatch readiness and dispatch APIs remain the authority for actual construction.
+
+Main-thread provider details stay behind adapter modules. Forge stores only bounded normalized metadata rather than raw JSONL streams. On control-plane startup, a thread left `running` is reconciled to an explicit interrupted/error state instead of pretending the old process survived.
 
 ## Adapter, dispatch and session boundary
 
@@ -109,7 +136,9 @@ The local control process owns live child-process handles. Durable state records
 - startup reconciliation marks leftover starting/running attempts interrupted and their sessions disconnected;
 - late terminal callbacks cannot overwrite an already terminal dispatch.
 
-The OpenCode adapter parses JSONL defensively and captures the first observed external `sessionID`, while child-process exit remains the authoritative completion signal.
+The OpenCode Builder adapter parses JSONL defensively and captures the first observed external `sessionID`, while child-process exit remains the authoritative completion signal.
+
+Main-thread turns use the smaller T015 provider runner contract rather than the Builder supervision contract. Their durable continuation point is the external provider thread/session ID; a control-plane restart reconciles an in-flight turn as interrupted instead of adopting an unknown child process.
 
 ## Review handoff invariant
 
@@ -158,5 +187,11 @@ Policy overrides for dependency satisfaction are intentionally deferred.
 - `GET /api/dispatches`
 - `POST /api/dispatches/:dispatchId/cancel`
 - `GET /api/events`
+- `GET|POST /api/threads`
+- `GET /api/threads/:threadId`
+- `POST /api/threads/:threadId/messages`
+- `GET|POST /api/threads/:threadId/tasks`
+- `GET|PATCH /api/threads/:threadId/tasks/:taskId`
+- `POST /api/threads/:threadId/handoffs`
 
-Automatic Reviewer dispatch, Git integration, worktree scheduling and parallel integration remain later milestones.
+Automatic Reviewer dispatch, Builder-adapter expansion, worktree scheduling, live streaming and parallel integration remain later milestones.

@@ -11,6 +11,8 @@ export function createEmptyState() {
     reviews: [],
     dispatches: [],
     events: [],
+    threads: [],
+    threadEvents: [],
   }
 }
 
@@ -18,7 +20,7 @@ function normalizeState(parsed) {
   if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.projects) || !Array.isArray(parsed.batches)) {
     throw new Error('Unsupported or invalid Mira Forge state file')
   }
-  for (const field of ['adapters', 'sessions', 'reviews', 'dispatches', 'events']) {
+  for (const field of ['adapters', 'sessions', 'reviews', 'dispatches', 'events', 'threads', 'threadEvents']) {
     if (parsed[field] !== undefined && !Array.isArray(parsed[field])) {
       throw new Error('Unsupported or invalid Mira Forge state file')
     }
@@ -30,6 +32,8 @@ function normalizeState(parsed) {
     reviews: parsed.reviews ?? [],
     dispatches: parsed.dispatches ?? [],
     events: parsed.events ?? [],
+    threads: parsed.threads ?? [],
+    threadEvents: parsed.threadEvents ?? [],
   }
 }
 

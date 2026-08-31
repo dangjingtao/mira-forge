@@ -24,6 +24,17 @@ import {
 } from './domain.mjs'
 import { DISPATCH_STATUSES, getDispatches, getRuntimeEvents } from './dispatch-domain.mjs'
 import { createDispatchManager, OPENCODE_ADAPTER_ID } from './dispatch-manager.mjs'
+import {
+  createCodexMainThreadAdapter,
+  createOpenCodeMainThreadAdapter,
+  parseMainThreadPrefixArgs,
+} from './main-thread-adapters.mjs'
+import {
+  MAIN_THREAD_ADAPTERS,
+  MAIN_THREAD_EVENT_TYPES,
+  MAIN_THREAD_STATUSES,
+} from './main-thread-domain.mjs'
+import { createMainThreadManager } from './main-thread-manager.mjs'
 import { createOpenCodeRunner, parseOpenCodePrefixArgs } from './opencode-adapter.mjs'
 import { DISPATCHABLE_TASK_STATUSES, getDispatchReadiness, validateBatchDependencies } from './readiness.mjs'
 import { createStore } from './store.mjs'
@@ -46,6 +57,28 @@ const dispatchManager = createDispatchManager({
 const openCodeAcceptance = createOpenCodeAcceptance({
   runner: openCodeRunner,
   timeoutMs: Number(process.env.MIRA_FORGE_ACCEPTANCE_TIMEOUT_MS || 120_000),
+})
+const mainThreadTimeoutMs = Number(process.env.MIRA_FORGE_MAIN_THREAD_TIMEOUT_MS || 300_000)
+const mainThreadManager = createMainThreadManager({
+  store,
+  adapters: new Map([
+    ['opencode', createOpenCodeMainThreadAdapter({
+      bin: process.env.MIRA_FORGE_OPENCODE_BIN || 'opencode',
+      prefixArgs: parseMainThreadPrefixArgs(
+        process.env.MIRA_FORGE_OPENCODE_THREAD_PREFIX_ARGS ?? process.env.MIRA_FORGE_OPENCODE_PREFIX_ARGS,
+        'OpenCode main thread prefix args',
+      ),
+      timeoutMs: mainThreadTimeoutMs,
+    })],
+    ['codex', createCodexMainThreadAdapter({
+      bin: process.env.MIRA_FORGE_CODEX_BIN || 'codex',
+      prefixArgs: parseMainThreadPrefixArgs(
+        process.env.MIRA_FORGE_CODEX_PREFIX_ARGS,
+        'Codex main thread prefix args',
+      ),
+      timeoutMs: mainThreadTimeoutMs,
+    })],
+  ]),
 })
 
 function sendJson(response, status, payload) {
@@ -144,6 +177,9 @@ const server = createServer(async (request, response) => {
       }
       return sendJson(response, 200, events)
     }
+    if (request.method === 'GET' && url.pathname === '/api/threads') {
+      return sendJson(response, 200, await mainThreadManager.listThreads(url.searchParams.get('projectId')))
+    }
     if (request.method === 'GET' && url.pathname === '/api/meta') {
       return sendJson(response, 200, {
         taskStatuses: TASK_STATUSES,
@@ -155,6 +191,9 @@ const server = createServer(async (request, response) => {
         dispatchStatuses: DISPATCH_STATUSES,
         dispatchableTaskStatuses: DISPATCHABLE_TASK_STATUSES,
         builtinBuilderAdapters: [OPENCODE_ADAPTER_ID],
+        mainThreadAdapters: MAIN_THREAD_ADAPTERS,
+        mainThreadStatuses: MAIN_THREAD_STATUSES,
+        mainThreadEventTypes: MAIN_THREAD_EVENT_TYPES,
         firstRunChecks: ['opencode'],
       })
     }
@@ -190,6 +229,10 @@ const server = createServer(async (request, response) => {
       const review = await store.mutate((state) => createReviewHandoff(state, body))
       return sendJson(response, 201, review)
     }
+    if (request.method === 'POST' && url.pathname === '/api/threads') {
+      const body = await readJson(request)
+      return sendJson(response, 201, await mainThreadManager.openThread(body))
+    }
 
     const heartbeatMatch = url.pathname.match(/^\/api\/adapters\/([^/]+)\/heartbeat$/)
     if (request.method === 'POST' && heartbeatMatch) {
@@ -213,6 +256,53 @@ const server = createServer(async (request, response) => {
       const body = await readJson(request)
       const review = await store.mutate((state) => resolveReviewHandoff(state, decodeURIComponent(rawReviewId), body))
       return sendJson(response, 200, review)
+    }
+
+    const threadMessageMatch = url.pathname.match(/^\/api\/threads\/([^/]+)\/messages$/)
+    if (request.method === 'POST' && threadMessageMatch) {
+      const [, rawThreadId] = threadMessageMatch
+      const body = await readJson(request)
+      return sendJson(response, 200, await mainThreadManager.sendMessage(decodeURIComponent(rawThreadId), body))
+    }
+
+    const threadTaskCollectionMatch = url.pathname.match(/^\/api\/threads\/([^/]+)\/tasks$/)
+    if (threadTaskCollectionMatch) {
+      const [, rawThreadId] = threadTaskCollectionMatch
+      const threadId = decodeURIComponent(rawThreadId)
+      if (request.method === 'GET') {
+        return sendJson(response, 200, await mainThreadManager.inspectTasks(threadId))
+      }
+      if (request.method === 'POST') {
+        const body = await readJson(request)
+        return sendJson(response, 201, await mainThreadManager.createTask(threadId, body))
+      }
+    }
+
+    const threadTaskMatch = url.pathname.match(/^\/api\/threads\/([^/]+)\/tasks\/([^/]+)$/)
+    if (threadTaskMatch) {
+      const [, rawThreadId, rawTaskId] = threadTaskMatch
+      const threadId = decodeURIComponent(rawThreadId)
+      const taskId = decodeURIComponent(rawTaskId)
+      if (request.method === 'GET') {
+        return sendJson(response, 200, await mainThreadManager.resolveTask(threadId, taskId))
+      }
+      if (request.method === 'PATCH') {
+        const body = await readJson(request)
+        return sendJson(response, 200, await mainThreadManager.updateTask(threadId, taskId, body))
+      }
+    }
+
+    const threadHandoffMatch = url.pathname.match(/^\/api\/threads\/([^/]+)\/handoffs$/)
+    if (request.method === 'POST' && threadHandoffMatch) {
+      const [, rawThreadId] = threadHandoffMatch
+      const body = await readJson(request)
+      return sendJson(response, 201, await mainThreadManager.createHandoff(decodeURIComponent(rawThreadId), body))
+    }
+
+    const threadMatch = url.pathname.match(/^\/api\/threads\/([^/]+)$/)
+    if (request.method === 'GET' && threadMatch) {
+      const [, rawThreadId] = threadMatch
+      return sendJson(response, 200, await mainThreadManager.getThread(decodeURIComponent(rawThreadId)))
     }
 
     const dispatchTaskMatch = url.pathname.match(/^\/api\/batches\/([^/]+)\/tasks\/([^/]+)\/dispatch$/)
@@ -261,6 +351,7 @@ const server = createServer(async (request, response) => {
 })
 
 await dispatchManager.reconcile()
+await mainThreadManager.reconcile()
 
 server.listen(port, host, () => {
   console.log(`Mira Forge control plane: http://${host}:${port}`)
