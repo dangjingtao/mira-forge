@@ -6,6 +6,7 @@ type Project = {
   rootPath: string
   repository: string | null
   integrationBranch: string
+  taskLedger?: string | null
   taskDir?: string | null
 }
 
@@ -61,9 +62,37 @@ type ForgeState = {
   events?: RuntimeEvent[]
 }
 
+type ForgeMeta = {
+  builderChoices?: string[]
+}
+
+type RepositoryTask = {
+  id: string
+  title: string
+  status: string
+}
+
+type RepositoryTaskSource = {
+  kind: string
+  ledgerRef: string
+  taskDirRef: string
+  tasks: RepositoryTask[]
+}
+
+type ResolvedRepositoryTask = RepositoryTask & {
+  cardStatus: string
+  taskRef: string
+  ledgerRef: string
+  warnings: string[]
+}
+
 type SelectedTask = {
   batch: Batch
   task: Task
+}
+
+type DispatchDraft = SelectedTask & {
+  taskRef: string
 }
 
 type DispatchReadiness = {
@@ -83,8 +112,13 @@ const statusLabels: Record<string, string> = {
   integrated: 'integrated',
 }
 
+const builderLabels: Record<string, string> = {
+  opencode: 'OpenCode',
+  piagent: 'PiAgent',
+  codex: 'Codex',
+}
+
 const activeDispatchStatuses = new Set(['starting', 'running'])
-const builtinBuilder = 'opencode-local'
 
 function taskKey(batchId: string, taskId: string) {
   return `${batchId}:${taskId}`
@@ -114,6 +148,7 @@ function formatEventData(event: RuntimeEvent) {
 
 function App() {
   const [state, setState] = useState<ForgeState | null>(null)
+  const [meta, setMeta] = useState<ForgeMeta | null>(null)
   const [connectionError, setConnectionError] = useState('')
   const [actionError, setActionError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -121,18 +156,27 @@ function App() {
   const [registering, setRegistering] = useState(false)
   const [palette, setPalette] = useState(false)
   const [selectedTaskKey, setSelectedTaskKey] = useState<string | null>(null)
-  const [dispatchTask, setDispatchTask] = useState<SelectedTask | null>(null)
+  const [dispatchTask, setDispatchTask] = useState<DispatchDraft | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Dispatch | null>(null)
   const [dispatching, setDispatching] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [batching, setBatching] = useState(false)
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchSaving, setBatchSaving] = useState(false)
+  const [sourceSaving, setSourceSaving] = useState(false)
+  const [batchSource, setBatchSource] = useState<RepositoryTaskSource | null>(null)
+  const [batchSourceError, setBatchSourceError] = useState('')
+  const [batchSelection, setBatchSelection] = useState<Set<string>>(new Set())
   const nameRef = useRef<HTMLInputElement>(null)
   const taskRefInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/state')
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      setState(await response.json())
+      const [stateResponse, metaResponse] = await Promise.all([fetch('/api/state'), fetch('/api/meta')])
+      if (!stateResponse.ok) throw new Error(`state HTTP ${stateResponse.status}`)
+      if (!metaResponse.ok) throw new Error(`meta HTTP ${metaResponse.status}`)
+      setState(await stateResponse.json())
+      setMeta(await metaResponse.json())
       setConnectionError('')
     } catch (cause) {
       setConnectionError(cause instanceof Error ? cause.message : String(cause))
@@ -161,6 +205,7 @@ function App() {
   )
   const dispatches = state?.dispatches ?? []
   const events = state?.events ?? []
+  const builderChoices = meta?.builderChoices?.length ? meta.builderChoices : ['opencode', 'piagent', 'codex']
 
   useEffect(() => {
     if (activeProject >= projects.length) setActiveProject(Math.max(projects.length - 1, 0))
@@ -168,6 +213,10 @@ function App() {
 
   useEffect(() => {
     setSelectedTaskKey(null)
+    setBatching(false)
+    setBatchSource(null)
+    setBatchSourceError('')
+    setBatchSelection(new Set())
   }, [selected?.id])
 
   const selectedTask = useMemo<SelectedTask | null>(() => {
@@ -185,7 +234,7 @@ function App() {
   )
 
   const activeBuilderDispatch = useMemo(
-    () => dispatches.find((dispatch) => dispatch.adapterId === builtinBuilder && activeDispatchStatuses.has(dispatch.status)) ?? null,
+    () => dispatches.find((dispatch) => activeDispatchStatuses.has(dispatch.status)) ?? null,
     [dispatches],
   )
 
@@ -199,6 +248,12 @@ function App() {
     ) ?? null
   }, [dispatches, selectedTask])
 
+  const existingRuntimeTaskIds = useMemo(() => new Set(
+    batches
+      .filter((batch) => batch.status !== 'integrated')
+      .flatMap((batch) => batch.tasks.filter((task) => task.status !== 'integrated').map((task) => task.id)),
+  ), [batches])
+
   const stats = useMemo(() => {
     const tasks = batches.flatMap((batch) => batch.tasks)
     return {
@@ -209,35 +264,67 @@ function App() {
     }
   }, [batches])
 
+  const prepareBatch = useCallback(async () => {
+    if (!selected) {
+      setActionError('select a project before creating a batch')
+      return
+    }
+
+    setBatching(true)
+    setBatchLoading(true)
+    setBatchSource(null)
+    setBatchSourceError('')
+    setBatchSelection(new Set())
+    setPalette(false)
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selected.id)}/tasks`)
+      const body = await response.json()
+      if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
+      setBatchSource(body as RepositoryTaskSource)
+      setActionError('')
+    } catch (cause) {
+      setBatchSourceError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBatchLoading(false)
+    }
+  }, [selected])
+
   const prepareDispatch = useCallback(async () => {
-    if (!selectedTask) {
+    if (!selectedTask || !selected) {
       setActionError('select a task row before dispatch')
       return
     }
     if (activeBuilderDispatch) {
-      setActionError(`${builtinBuilder} is busy with ${activeBuilderDispatch.taskId}; first-use dispatch is serial`)
+      setActionError(`${activeBuilderDispatch.adapterId} is busy with ${activeBuilderDispatch.taskId}; Builder dispatch is serial`)
       return
     }
 
     try {
-      const response = await fetch(`/api/batches/${encodeURIComponent(selectedTask.batch.id)}/dispatch-ready`)
-      const body = await response.json()
-      if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
+      const readinessResponse = await fetch(`/api/batches/${encodeURIComponent(selectedTask.batch.id)}/dispatch-ready`)
+      const readinessBody = await readinessResponse.json()
+      if (!readinessResponse.ok) throw new Error(parseErrorBody(readinessBody, `HTTP ${readinessResponse.status}`))
 
-      const readiness = body as DispatchReadiness
+      const readiness = readinessBody as DispatchReadiness
       if (!readiness.ready.some((item) => item.taskId === selectedTask.task.id)) {
         const blocked = readiness.blocked.find((item) => item.taskId === selectedTask.task.id)
         const reasons = blocked?.reasons.map((reason) => reason.code).join(', ') || 'unknown reason'
         throw new Error(`task is not dispatch-ready: ${reasons}`)
       }
 
-      setDispatchTask(selectedTask)
+      const taskResponse = await fetch(
+        `/api/projects/${encodeURIComponent(selected.id)}/tasks/${encodeURIComponent(selectedTask.task.id)}`,
+      )
+      const taskBody = await taskResponse.json()
+      if (!taskResponse.ok) throw new Error(parseErrorBody(taskBody, `HTTP ${taskResponse.status}`))
+      const repositoryTask = taskBody as ResolvedRepositoryTask
+
+      setDispatchTask({ ...selectedTask, taskRef: repositoryTask.taskRef })
       setPalette(false)
       setActionError('')
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause))
     }
-  }, [activeBuilderDispatch, selectedTask])
+  }, [activeBuilderDispatch, selected, selectedTask])
 
   const prepareCancel = useCallback(() => {
     if (!selectedActiveDispatch) {
@@ -259,11 +346,12 @@ function App() {
         setRegistering(false)
         setDispatchTask(null)
         setCancelTarget(null)
+        setBatching(false)
         return
       }
 
       if (typing) return
-      if (registering || dispatchTask || cancelTarget) return
+      if (registering || dispatchTask || cancelTarget || batching) return
 
       if (palette) {
         if (event.key === 'q') {
@@ -273,6 +361,9 @@ function App() {
           event.preventDefault()
           setRegistering(true)
           setPalette(false)
+        } else if (event.key === 'b') {
+          event.preventDefault()
+          void prepareBatch()
         } else if (event.key === 'r') {
           event.preventDefault()
           void load()
@@ -303,6 +394,10 @@ function App() {
         event.preventDefault()
         setRegistering(true)
       }
+      if (event.key === 'b') {
+        event.preventDefault()
+        void prepareBatch()
+      }
       if (event.key === '/') {
         event.preventDefault()
         setPalette(true)
@@ -323,7 +418,7 @@ function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cancelTarget, dispatchTask, load, palette, prepareCancel, prepareDispatch, projects.length, registering])
+  }, [batching, cancelTarget, dispatchTask, load, palette, prepareBatch, prepareCancel, prepareDispatch, projects.length, registering])
 
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -338,6 +433,8 @@ function App() {
           rootPath: form.get('rootPath'),
           repository: form.get('repository'),
           integrationBranch: form.get('integrationBranch'),
+          taskLedger: form.get('taskLedger'),
+          taskDir: form.get('taskDir'),
         }),
       })
       const body = await response.json()
@@ -350,6 +447,68 @@ function App() {
       setActionError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function configureTaskSource(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selected) return
+    const form = new FormData(event.currentTarget)
+    setSourceSaving(true)
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selected.id)}/task-source`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          taskLedger: form.get('taskLedger'),
+          taskDir: form.get('taskDir'),
+        }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
+      setBatchSource(body.source as RepositoryTaskSource)
+      setBatchSourceError('')
+      setBatchSelection(new Set())
+      setActionError('')
+      await load()
+    } catch (cause) {
+      setBatchSourceError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setSourceSaving(false)
+    }
+  }
+
+  async function createBatchFromSource(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selected || !batchSource) return
+    const taskIds = [...batchSelection]
+    if (!taskIds.length) {
+      setBatchSourceError('select at least one repository task')
+      return
+    }
+
+    const form = new FormData(event.currentTarget)
+    setBatchSaving(true)
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selected.id)}/batches`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: form.get('name'), taskIds }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
+      const created = body as Batch
+      setBatching(false)
+      setBatchSource(null)
+      setBatchSourceError('')
+      setBatchSelection(new Set())
+      setActionError('')
+      await load()
+      if (created.tasks[0]) setSelectedTaskKey(taskKey(created.id, created.tasks[0].id))
+    } catch (cause) {
+      setBatchSourceError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBatchSaving(false)
     }
   }
 
@@ -366,7 +525,7 @@ function App() {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            adapterId: builtinBuilder,
+            builder: form.get('builder'),
             taskRef: form.get('taskRef'),
             model: form.get('model'),
             agent: form.get('agent'),
@@ -404,9 +563,14 @@ function App() {
     }
   }
 
-  const defaultTaskRef = dispatchTask && selected?.taskDir
-    ? `${selected.taskDir.replace(/\/$/, '')}/${dispatchTask.task.id}.md`
-    : ''
+  function toggleBatchTask(taskId: string) {
+    setBatchSelection((current) => {
+      const next = new Set(current)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
 
   return (
     <main className="forge-tui">
@@ -462,12 +626,17 @@ function App() {
               </div>
 
               <div className="stream-label">
-                RUNTIME STREAM
-                <span>
-                  {activeBuilderDispatch
-                    ? `${builtinBuilder} busy · ${activeBuilderDispatch.taskId}`
-                    : `${selectedEvents.length} events · ${batches.length} batches`}
-                </span>
+                <span className="stream-heading">RUNTIME STREAM</span>
+                <div className="stream-right">
+                  <span className="stream-meta">
+                    {activeBuilderDispatch
+                      ? `${activeBuilderDispatch.adapterId} busy · ${activeBuilderDispatch.taskId}`
+                      : `${selectedEvents.length} events · ${batches.length} batches`}
+                  </span>
+                  <button className="stream-action" type="button" onClick={() => void prepareBatch()}>
+                    + batch <kbd>b</kbd>
+                  </button>
+                </div>
               </div>
 
               {batches.length ? batches.map((batch) => (
@@ -504,7 +673,10 @@ function App() {
                   <span className="prompt">›</span>
                   <div>
                     <strong>no batches to dispatch</strong>
-                    <p>Forge only executes referenced project tasks. Create a Batch through the runtime API first.</p>
+                    <p>Create a Batch from repository Task Cards. Forge keeps the cards in the repository as the source of truth.</p>
+                    <button className="empty-action" type="button" onClick={() => void prepareBatch()}>
+                      create batch from repo tasks <kbd>b</kbd>
+                    </button>
                   </div>
                 </div>
               )}
@@ -533,6 +705,7 @@ function App() {
           <footer className="keybar">
             <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
             <span><kbd>tab</kbd> select task</span>
+            <span><kbd>b</kbd> new batch</span>
             <span><kbd>d</kbd> dispatch</span>
             <span><kbd>x</kbd> cancel</span>
             <span><kbd>n</kbd> new project</span>
@@ -551,8 +724,64 @@ function App() {
             <label>root path<input name="rootPath" placeholder="/absolute/path/to/project" required /></label>
             <label>repository <span className="optional">optional</span><input name="repository" placeholder="https://github.com/..." /></label>
             <label>integration branch<input name="integrationBranch" defaultValue="dev" /></label>
+            <div className="form-pair">
+              <label>task ledger <span className="optional">optional</span><input name="taskLedger" placeholder="docs/workbench/00-work-ledger.md" /></label>
+              <label>task directory <span className="optional">optional</span><input name="taskDir" placeholder="docs/workbench/tasks" /></label>
+            </div>
             <button type="submit" disabled={saving}>{saving ? 'registering...' : 'register project  ↵'}</button>
           </form>
+        </div>
+      )}
+
+      {batching && selected && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBatching(false) }}>
+          {batchLoading ? (
+            <div className="action-modal batch-modal">
+              <div className="modal-title">NEW BATCH <kbd>esc</kbd></div>
+              <p className="modal-loading">loading repository task source...</p>
+            </div>
+          ) : batchSource ? (
+            <form className="action-modal batch-modal" onSubmit={createBatchFromSource}>
+              <div className="modal-title">NEW BATCH <kbd>esc</kbd></div>
+              <div className="source-summary">
+                <strong>{batchSource.ledgerRef}</strong>
+                <span>{batchSource.tasks.length} repository tasks · {batchSelection.size} selected</span>
+              </div>
+              {batchSourceError && <div className="source-error" aria-live="polite">! {batchSourceError}</div>}
+              <label>batch name <span className="optional">optional</span><input name="name" placeholder="next construction batch" /></label>
+              <div className="repo-task-picker" role="group" aria-label="Repository tasks">
+                {batchSource.tasks.map((task) => {
+                  const alreadyInBatch = existingRuntimeTaskIds.has(task.id)
+                  return (
+                    <label className={`repo-task-option ${alreadyInBatch ? 'disabled' : ''}`} key={task.id}>
+                      <input
+                        type="checkbox"
+                        checked={batchSelection.has(task.id)}
+                        disabled={alreadyInBatch}
+                        onChange={() => toggleBatchTask(task.id)}
+                      />
+                      <code>{task.id}</code>
+                      <span className="repo-task-title">{task.title}</span>
+                      <span className="repo-task-state">{alreadyInBatch ? 'in batch' : task.status}</span>
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="serial-note">Task Cards stay in the repository; Batch stores execution state only.</p>
+              <button type="submit" disabled={batchSaving || batchSelection.size === 0}>
+                {batchSaving ? 'creating...' : `create batch with ${batchSelection.size} task${batchSelection.size === 1 ? '' : 's'}  ↵`}
+              </button>
+            </form>
+          ) : (
+            <form className="action-modal batch-modal" onSubmit={configureTaskSource}>
+              <div className="modal-title">TASK SOURCE REQUIRED <kbd>esc</kbd></div>
+              <div className="source-error" aria-live="polite">! {batchSourceError || 'repository task source is not configured'}</div>
+              <p className="source-config-note">Configure repository-relative Markdown paths. Forge validates them before saving.</p>
+              <label>task ledger<input name="taskLedger" defaultValue={selected.taskLedger ?? ''} placeholder="docs/workbench/00-work-ledger.md" required /></label>
+              <label>task directory<input name="taskDir" defaultValue={selected.taskDir ?? ''} placeholder="docs/workbench/tasks" required /></label>
+              <button type="submit" disabled={sourceSaving}>{sourceSaving ? 'validating...' : 'save source & load tasks  ↵'}</button>
+            </form>
+          )}
         </div>
       )}
 
@@ -562,22 +791,29 @@ function App() {
             <div className="modal-title">DISPATCH {dispatchTask.task.id} <kbd>esc</kbd></div>
             <div className="action-summary">
               <strong>{dispatchTask.task.title}</strong>
-              <span>{builtinBuilder} · serial builder</span>
+              <span>repository task · serial Builder</span>
             </div>
+            <label>
+              Builder
+              <select name="builder" defaultValue={builderChoices[0]} required>
+                {builderChoices.map((builder) => <option value={builder} key={builder}>{builderLabels[builder] ?? builder}</option>)}
+              </select>
+            </label>
             <label>
               task card ref
               <input
                 ref={taskRefInput}
+                className="readonly-ref"
                 name="taskRef"
-                defaultValue={defaultTaskRef}
-                placeholder={`path/to/${dispatchTask.task.id}.md`}
+                value={dispatchTask.taskRef}
+                readOnly
                 required
               />
             </label>
             <label>model <span className="optional">optional</span><input name="model" placeholder="provider/model" /></label>
-            <label>agent <span className="optional">optional</span><input name="agent" placeholder="OpenCode agent name" /></label>
+            <label>agent <span className="optional">OpenCode only</span><input name="agent" placeholder="agent name" /></label>
             <p className="serial-note">one active Builder dispatch at a time · no auto-push / merge / deploy</p>
-            <button type="submit" disabled={dispatching}>{dispatching ? 'dispatching...' : 'dispatch with opencode  ↵'}</button>
+            <button type="submit" disabled={dispatching}>{dispatching ? 'dispatching...' : 'dispatch task  ↵'}</button>
           </form>
         </div>
       )}
@@ -603,6 +839,7 @@ function App() {
           <div className="command-palette">
             <div className="modal-title">COMMANDS <kbd>esc</kbd></div>
             <button onClick={() => { setRegistering(true); setPalette(false) }}><kbd>n</kbd><span>new project</span></button>
+            <button disabled={!selected} onClick={() => void prepareBatch()}><kbd>b</kbd><span>new batch from repository tasks</span></button>
             <button onClick={() => { void load(); setPalette(false) }}><kbd>r</kbd><span>refresh state</span></button>
             <button disabled={!selectedTask || Boolean(activeBuilderDispatch)} onClick={() => void prepareDispatch()}>
               <kbd>d</kbd><span>{selectedTask ? `dispatch ${selectedTask.task.id}` : 'dispatch selected task'}</span>
