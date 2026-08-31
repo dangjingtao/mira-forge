@@ -8,8 +8,12 @@ import './styles.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <>
-      <App />
-      <MainThreadPanel />
+      <div className="forge-product-shell">
+        <App />
+        <aside className="forge-thread-rail" aria-label="Main thread workspace">
+          <MainThreadPanel />
+        </aside>
+      </div>
       <ShortcutFeedback />
     </>
   </StrictMode>,

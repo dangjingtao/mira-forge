@@ -105,7 +105,7 @@ function FirstRunCheck() {
               <div className={`acceptance-result ${result.ok ? 'acceptance-pass' : 'acceptance-fail'}`} aria-live="polite">
                 <strong>{result.ok ? 'PASS' : 'FAIL'}</strong>
                 <span>{result.ok ? 'OpenCode is ready for Forge dispatch.' : result.error}</span>
-                {!result.ok && result.diagnostic && <details className="acceptance-diagnostic"><summary>查看诊断信息</summary><pre>{result.diagnostic}</pre></details>}
+                {!result.ok && result.diagnostic && <details className="acceptance-diagnostic"><summary>View diagnostic details</summary><pre>{result.diagnostic}</pre></details>}
                 <dl>
                   <div><dt>session</dt><dd>{result.externalSessionId ?? 'not observed'}</dd></div>
                   <div><dt>exit</dt><dd>{result.exitCode ?? '—'}</dd></div>
