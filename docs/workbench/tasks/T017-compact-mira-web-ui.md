@@ -1,6 +1,6 @@
 # T017 — Compact Mira Web UI
 
-Status: PASS
+Status: REVIEW
 
 Depends on: T015 PASS.
 
@@ -72,13 +72,13 @@ Use the repository/current Mira visual source if a canonical primary color is al
 
 ## Delivery Evidence
 
-- Branch: `task/T017-compact-mira-web-ui` from `dev`.
-- PR: `#5` — `T017 compact Mira web UI`.
+- Implementation merged to `dev` through PR `#5` — `T017 compact Mira web UI`.
 - Mira accent uses the verified current primary `#FA7328` with hover `#E86A21`.
 - Main Thread is integrated into the main work surface as a persistent right rail; under `1180px` it becomes an integrated lower region instead of covering the control plane as a floating utility window.
 - Existing project/task keyboard interactions, thread actions, dispatch/cancel contracts and provider/runtime APIs were not changed.
 - The current `dev` choice to leave the First-run Check launcher entry unmounted is preserved; its dormant UI remains styled and the remaining Chinese diagnostic label was replaced with English.
-- GitHub Actions Verify run `33363256907` passed on head `e8d35d75c8823553120d3a74e189e0a1672f53fd` before this ledger-only update. The job passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
+- GitHub Actions Verify run `33363325558` passed on the final PR head. The job passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
+- Automated verification is complete. Visual/browser smoke is still required before changing `REVIEW` to `PASS`, because the acceptance criteria include visual density, hierarchy and coexistence on a laptop viewport.
 
 ## Out of Scope
 
@@ -94,4 +94,4 @@ Resolved for T017: the canonical Mira primary was read from the current Mira vis
 
 ## Handoff
 
-T017 establishes the compact product shell and visual token layer. T018 can add richer live-runtime information inside these regions without reopening T014-T016 runtime contracts.
+T017 implementation is merged and ready for visual smoke. After visual acceptance, mark it PASS. T018 can then add richer live-runtime information inside these regions without reopening T014-T016 runtime contracts.
