@@ -37,7 +37,7 @@ export function buildPiAgentArgs({ prefixArgs = [], projectRoot, prompt, model }
 
   const args = [...prefixArgs, '--mode', 'json', '-p', '--no-session']
   if (optionalString(model)) args.push('--model', model.trim())
-  args.push('--', prompt)
+  args.push(prompt)
   return args
 }
 
