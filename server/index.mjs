@@ -46,6 +46,12 @@ import {
 import { createMainThreadManager } from './main-thread-manager.mjs'
 import { createOpenCodeRunner, parseOpenCodePrefixArgs } from './opencode-adapter.mjs'
 import { createPiAgentRunner, parsePiAgentPrefixArgs } from './piagent-adapter.mjs'
+import {
+  configureProjectTaskSource,
+  createProjectBatch,
+  inspectProjectTaskSource,
+  resolveProjectTask,
+} from './project-task-actions.mjs'
 import { DISPATCHABLE_TASK_STATUSES, getDispatchReadiness, validateBatchDependencies } from './readiness.mjs'
 import { createStore } from './store.mjs'
 
@@ -263,6 +269,42 @@ const server = createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/api/threads') {
       const body = await readJson(request)
       return sendJson(response, 201, await mainThreadManager.openThread(body))
+    }
+
+    const projectTaskSourceMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/task-source$/)
+    if (projectTaskSourceMatch) {
+      const [, rawProjectId] = projectTaskSourceMatch
+      const projectId = decodeURIComponent(rawProjectId)
+      if (request.method === 'GET') {
+        return sendJson(response, 200, await inspectProjectTaskSource(store, projectId))
+      }
+      if (request.method === 'PATCH') {
+        const body = await readJson(request)
+        return sendJson(response, 200, await configureProjectTaskSource(store, projectId, body))
+      }
+    }
+
+    const projectTaskCollectionMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/tasks$/)
+    if (request.method === 'GET' && projectTaskCollectionMatch) {
+      const [, rawProjectId] = projectTaskCollectionMatch
+      return sendJson(response, 200, await inspectProjectTaskSource(store, decodeURIComponent(rawProjectId)))
+    }
+
+    const projectTaskMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/tasks\/([^/]+)$/)
+    if (request.method === 'GET' && projectTaskMatch) {
+      const [, rawProjectId, rawTaskId] = projectTaskMatch
+      return sendJson(response, 200, await resolveProjectTask(
+        store,
+        decodeURIComponent(rawProjectId),
+        decodeURIComponent(rawTaskId),
+      ))
+    }
+
+    const projectBatchCollectionMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/batches$/)
+    if (request.method === 'POST' && projectBatchCollectionMatch) {
+      const [, rawProjectId] = projectBatchCollectionMatch
+      const body = await readJson(request)
+      return sendJson(response, 201, await createProjectBatch(store, decodeURIComponent(rawProjectId), body))
     }
 
     const heartbeatMatch = url.pathname.match(/^\/api\/adapters\/([^/]+)\/heartbeat$/)
