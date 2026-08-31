@@ -12,10 +12,16 @@ import {
   isTerminalDispatch,
   transitionDispatch,
 } from './dispatch-domain.mjs'
+import {
+  BUILTIN_BUILDERS,
+  CODEX_ADAPTER_ID,
+  OPENCODE_ADAPTER_ID,
+  PIAGENT_ADAPTER_ID,
+  resolveBuilderAdapterId,
+} from './builder-contract.mjs'
 import { getDispatchReadiness } from './readiness.mjs'
 
 const ACTIVE_SESSION_STATUSES = ['starting', 'running', 'waiting']
-const OPENCODE_ADAPTER_ID = 'opencode-local'
 
 function requiredString(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`)
@@ -24,6 +30,11 @@ function requiredString(value, name) {
 
 function optionalString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function boundedString(value, limit = 256) {
+  const text = optionalString(value)
+  return text ? text.slice(0, limit) : null
 }
 
 function findDispatch(state, dispatchId) {
@@ -44,12 +55,13 @@ function resolveBinding(state, batchId, taskId) {
 
 function ensureBuilderAdapter(state, adapterId) {
   let adapter = (state.adapters ?? []).find((item) => item.id === adapterId)
-  if (!adapter && adapterId === OPENCODE_ADAPTER_ID) {
+  const builtin = BUILTIN_BUILDERS[adapterId]
+  if (!adapter && builtin) {
     adapter = registerAdapter(state, {
-      id: OPENCODE_ADAPTER_ID,
-      name: 'OpenCode Local',
-      kind: 'builder',
-      capabilities: ['code', 'terminal', 'opencode-run'],
+      id: builtin.id,
+      name: builtin.name,
+      kind: builtin.kind,
+      capabilities: [...builtin.capabilities],
     })
   }
   if (!adapter) throw new Error('adapterId not found')
@@ -57,9 +69,38 @@ function ensureBuilderAdapter(state, adapterId) {
   return adapter
 }
 
-function findActiveAdapterDispatch(state, adapterId) {
-  return getDispatches(state).find((dispatch) =>
-    dispatch.adapterId === adapterId && !isTerminalDispatch(dispatch.status))
+function findActiveBuilderDispatch(state) {
+  return getDispatches(state).find((dispatch) => !isTerminalDispatch(dispatch.status))
+}
+
+function observedExternalSessionId(event) {
+  return optionalString(event?.externalSessionId)
+    || optionalString(event?.sessionID)
+    || optionalString(event?.thread_id)
+    || optionalString(event?.threadId)
+}
+
+function providerEventData(event) {
+  if (!event?.provider || typeof event.provider !== 'object') return null
+  const provider = {
+    adapter: boundedString(event.provider.adapter, 80),
+    eventType: boundedString(event.provider.eventType, 120),
+    itemType: boundedString(event.provider.itemType, 120),
+    status: boundedString(event.provider.status, 80),
+  }
+  const tool = event?.tool && typeof event.tool === 'object'
+    ? {
+        name: boundedString(event.tool.name, 160),
+        status: boundedString(event.tool.status, 80),
+      }
+    : null
+  const artifact = event?.artifact && typeof event.artifact === 'object'
+    ? {
+        kind: boundedString(event.artifact.kind, 80),
+        ref: boundedString(event.artifact.ref, 512),
+      }
+    : null
+  return { provider, tool, artifact }
 }
 
 export function buildTaskDispatchPrompt({ project, batch, task, taskRef }) {
@@ -136,24 +177,27 @@ export function createDispatchManager({ store, runners }) {
   }
 
   async function observeEvent(dispatchId, event) {
-    const externalSessionId = optionalString(event?.sessionID)
-    if (!externalSessionId) return
+    const externalSessionId = observedExternalSessionId(event)
+    const evidence = providerEventData(event)
+    if (!externalSessionId && !evidence) return
 
     await store.mutate((state) => {
       const dispatch = findDispatch(state, dispatchId)
-      if (isTerminalDispatch(dispatch.status) || dispatch.externalSessionId === externalSessionId) return dispatch
-      if (dispatch.externalSessionId && dispatch.externalSessionId !== externalSessionId) {
+      if (isTerminalDispatch(dispatch.status)) return dispatch
+
+      if (externalSessionId && dispatch.externalSessionId && dispatch.externalSessionId !== externalSessionId) {
         dispatchEvent(state, dispatch, 'dispatch.warning', {
           code: 'external_session_changed',
           observedSessionId: externalSessionId,
         })
-        return dispatch
+      } else if (externalSessionId && dispatch.externalSessionId !== externalSessionId) {
+        transitionDispatch(state, dispatch.id, dispatch.status, { externalSessionId })
+        const session = (state.sessions ?? []).find((item) => item.id === dispatch.sessionId)
+        if (session) updateSession(state, session.id, { externalSessionId })
+        dispatchEvent(state, dispatch, 'dispatch.session_bound', { externalSessionId })
       }
 
-      transitionDispatch(state, dispatch.id, dispatch.status, { externalSessionId })
-      const session = (state.sessions ?? []).find((item) => item.id === dispatch.sessionId)
-      if (session) updateSession(state, session.id, { externalSessionId })
-      dispatchEvent(state, dispatch, 'dispatch.session_bound', { externalSessionId })
+      if (evidence) dispatchEvent(state, dispatch, 'dispatch.provider_event', evidence)
       return dispatch
     })
   }
@@ -165,7 +209,8 @@ export function createDispatchManager({ store, runners }) {
       if (isTerminalDispatch(dispatch.status)) return dispatch
       const { batch, task } = resolveBinding(state, dispatch.batchId, dispatch.taskId)
       const session = (state.sessions ?? []).find((item) => item.id === dispatch.sessionId)
-      const success = result.code === 0
+      const providerError = optionalString(result.errorText)
+      const success = result.code === 0 && !providerError
 
       if (session && ACTIVE_SESSION_STATUSES.includes(session.status)) {
         updateSession(state, session.id, { status: success ? 'completed' : 'failed' })
@@ -186,7 +231,7 @@ export function createDispatchManager({ store, runners }) {
           externalSessionId: dispatch.externalSessionId,
         })
       } else {
-        const message = optionalString(result.stderr) || `Builder exited with code ${result.code ?? 'unknown'}`
+        const message = providerError || optionalString(result.stderr) || `Builder exited with code ${result.code ?? 'unknown'}`
         transitionDispatch(state, dispatch.id, 'failed', {
           exitCode: result.code ?? null,
           signal: result.signal ?? null,
@@ -225,7 +270,7 @@ export function createDispatchManager({ store, runners }) {
   async function dispatchTask(input) {
     const batchId = requiredString(input.batchId, 'batchId')
     const taskId = requiredString(input.taskId, 'taskId')
-    const adapterId = optionalString(input.adapterId) || OPENCODE_ADAPTER_ID
+    const adapterId = resolveBuilderAdapterId(input)
     const runner = runners.get(adapterId)
     if (!runner) throw new Error(`no runner configured for adapter: ${adapterId}`)
 
@@ -239,9 +284,9 @@ export function createDispatchManager({ store, runners }) {
       }
 
       const adapter = ensureBuilderAdapter(state, adapterId)
-      const activeAdapterDispatch = findActiveAdapterDispatch(state, adapter.id)
-      if (activeAdapterDispatch) {
-        throw new Error(`builder adapter already has an active dispatch: ${activeAdapterDispatch.id}`)
+      const activeBuilderDispatch = findActiveBuilderDispatch(state)
+      if (activeBuilderDispatch) {
+        throw new Error(`builder dispatch already active: ${activeBuilderDispatch.id}`)
       }
 
       const promptInfo = resolvePrompt(input, binding)
@@ -369,4 +414,4 @@ export function createDispatchManager({ store, runners }) {
   }
 }
 
-export { OPENCODE_ADAPTER_ID }
+export { CODEX_ADAPTER_ID, OPENCODE_ADAPTER_ID, PIAGENT_ADAPTER_ID }
