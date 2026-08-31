@@ -5,6 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createOpenCodeAcceptance } from './acceptance.mjs'
+import { createCodexDesktopMainThreadAdapter } from './codex-desktop-adapter.mjs'
 import {
   ADAPTER_KINDS,
   ADAPTER_STATUSES,
@@ -67,6 +68,14 @@ const mainThreadManager = createMainThreadManager({
       prefixArgs: parseMainThreadPrefixArgs(
         process.env.MIRA_FORGE_OPENCODE_THREAD_PREFIX_ARGS ?? process.env.MIRA_FORGE_OPENCODE_PREFIX_ARGS,
         'OpenCode main thread prefix args',
+      ),
+      timeoutMs: mainThreadTimeoutMs,
+    })],
+    ['codex-desktop', createCodexDesktopMainThreadAdapter({
+      bin: process.env.MIRA_FORGE_CODEX_DESKTOP_BIN || null,
+      prefixArgs: parseMainThreadPrefixArgs(
+        process.env.MIRA_FORGE_CODEX_DESKTOP_PREFIX_ARGS,
+        'Codex Desktop app-server prefix args',
       ),
       timeoutMs: mainThreadTimeoutMs,
     })],
