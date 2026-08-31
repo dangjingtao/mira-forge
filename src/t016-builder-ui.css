@@ -160,6 +160,9 @@
   width: 13px !important;
   height: 13px;
   margin: 0 !important;
+  padding: 0 !important;
+  border: 0;
+  background: transparent;
   accent-color: var(--mira-accent);
 }
 
