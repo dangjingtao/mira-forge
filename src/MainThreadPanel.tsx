@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import './main-thread.css'
 
+type MainThreadAdapter = 'opencode' | 'codex-desktop' | 'codex'
+
 type Project = {
   id: string
   name: string
@@ -9,7 +11,7 @@ type Project = {
 type MainThread = {
   id: string
   projectId: string
-  adapter: 'opencode' | 'codex'
+  adapter: MainThreadAdapter
   title: string
   model: string | null
   status: string
@@ -134,7 +136,7 @@ function MainThreadPanel() {
   const [threads, setThreads] = useState<MainThread[]>([])
   const [threadId, setThreadId] = useState('')
   const [snapshot, setSnapshot] = useState<ThreadSnapshot | null>(null)
-  const [adapter, setAdapter] = useState<'opencode' | 'codex'>('opencode')
+  const [adapter, setAdapter] = useState<MainThreadAdapter>('opencode')
   const [model, setModel] = useState('')
   const [draft, setDraft] = useState('')
   const [creating, setCreating] = useState(false)
@@ -286,8 +288,9 @@ function MainThreadPanel() {
 
           {!threadId && projectId && (
             <form className="main-thread-create" onSubmit={createThread}>
-              <select value={adapter} onChange={(event) => setAdapter(event.target.value as 'opencode' | 'codex')}>
+              <select value={adapter} onChange={(event) => setAdapter(event.target.value as MainThreadAdapter)}>
                 <option value="opencode">OpenCode</option>
+                <option value="codex-desktop">Codex Desktop</option>
                 <option value="codex">Codex CLI</option>
               </select>
               <input value={model} onChange={(event) => setModel(event.target.value)} placeholder="model · optional" />
