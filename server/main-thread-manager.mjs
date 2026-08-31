@@ -124,6 +124,9 @@ export function createMainThreadManager({ store, adapters }) {
         message: prompt,
         externalThreadId: thread.externalThreadId,
         model: optionalString(input?.model) || thread.model,
+        onEvent: async (event) => {
+          await store.mutate((nextState) => appendMainThreadEvent(nextState, thread.id, event))
+        },
       })
 
       await store.mutate((nextState) => completeMainThreadTurn(nextState, thread.id, result))
