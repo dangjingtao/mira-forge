@@ -1,0 +1,116 @@
+/* T017 visual smoke follow-up: keep Mira orange scarce and intentional. */
+
+/* Structural labels and ordinary controls stay neutral. */
+.side-title span,
+.eyebrow,
+.stream-label,
+.event-log-title {
+  color: var(--muted);
+}
+
+.project-item.selected {
+  background: var(--panel2);
+}
+
+.project-item .cursor,
+.new-project,
+.refresh,
+.task b,
+.prompt,
+.event-task,
+.event-started strong,
+.event-session_bound strong {
+  color: var(--text);
+}
+
+.new-project:hover,
+.refresh:hover {
+  color: var(--bright);
+}
+
+.dot-reviewing {
+  background: var(--yellow);
+}
+
+.status-reviewing {
+  color: var(--yellow);
+}
+
+.register-modal button,
+.action-modal button {
+  border-color: var(--line-strong);
+  background: var(--panel2);
+  color: var(--bright);
+}
+
+.register-modal button:hover,
+.action-modal button:hover {
+  border-color: var(--mira-accent);
+  color: var(--mira-accent);
+}
+
+.command-palette button:hover {
+  background: var(--panel2);
+}
+
+.task-button.selected-task {
+  background: var(--panel2);
+  box-shadow: inset 2px 0 0 var(--mira-accent);
+}
+
+/* Main Thread: neutral chrome, accent reserved for focus and rare high-value cues. */
+.main-thread-head button {
+  color: var(--text);
+}
+
+.main-thread-head button:hover {
+  background: var(--panel2);
+  color: var(--bright);
+}
+
+.main-thread-create button,
+.main-thread-compose button {
+  border-color: var(--line-strong);
+  background: var(--panel2);
+  color: var(--bright);
+}
+
+.main-thread-create button:hover,
+.main-thread-compose button:hover {
+  border-color: var(--mira-accent);
+  color: var(--mira-accent);
+}
+
+.main-thread-event.role-user {
+  border-left-color: var(--line-strong);
+  background: var(--panel2);
+}
+
+.main-thread-event.role-user > span {
+  color: var(--muted);
+}
+
+.main-thread-event.role-assistant > span {
+  color: var(--bright);
+}
+
+.main-thread-event.event-thinking > span,
+.main-thread-process > summary::before {
+  color: var(--muted);
+}
+
+/* Collapse/expand is a state toggle, not a directional movement control. */
+.main-thread-head > button {
+  min-width: 24px;
+  font-size: 0;
+}
+
+.main-thread-head > button::before {
+  content: "−";
+  font-size: 14px;
+  line-height: 1;
+}
+
+.main-thread-panel.collapsed .main-thread-head > button::before {
+  content: "+";
+}
