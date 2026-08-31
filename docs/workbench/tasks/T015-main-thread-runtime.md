@@ -1,6 +1,6 @@
 # T015 — Main Thread Runtime for Codex and OpenCode
 
-Status: TODO
+Status: REVIEW
 
 Depends on: T014 PASS.
 
@@ -68,6 +68,32 @@ Prefer a small normalized event contract such as message/tool/status/artifact/ha
 - No dispatch occurs without an explicit user/agent action.
 - Thread events are testable without requiring a real provider in CI; real-provider acceptance is limited to a small machine-level check.
 - `npm run check` remains green.
+
+## Implementation
+
+- `server/main-thread-domain.mjs` owns durable provider-neutral `threads` and normalized `threadEvents` (`message / tool / status / artifact / handoff`). Main threads are deliberately separate from Builder/Reviewer sessions.
+- `server/main-thread-adapters.mjs` implements the minimum local CLI contract for OpenCode and Codex. OpenCode is pinned to `plan` with a read-oriented `OPENCODE_PERMISSION`; Codex uses JSON execution with read-only sandboxing and non-interactive approval policy.
+- Codex resume requires the provider to report the exact requested thread ID. Provider-reported file changes are treated as a contract violation instead of successful main-thread work.
+- `server/main-thread-manager.mjs` injects bounded registered-project/task-index context, reuses the T014 task-source module for inspect/resolve/create/update, and creates reference-only dispatch handoffs without launching a Builder.
+- Schema-1 state adds `threads` and `threadEvents` as backward-compatible additive collections. A control-plane restart reconciles an in-flight main-thread turn to an explicit interrupted/error state.
+- `server/index.mjs` exposes thread/message/task/handoff endpoints without changing the existing dispatch authority.
+- `src/MainThreadPanel.tsx` adds a compact persistent Web surface for project selection, OpenCode/Codex thread creation/continuation, conversation and durable event replay. The larger visual redesign remains T017.
+
+## Repository Verification
+
+- Focused pre-PR pure-Node checks: 13 tests passed for thread domain, provider boundaries and additive store compatibility.
+- Verify #93 on PR #4 passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` against head `b65d6785764e10f48944891adc746550091599bd`.
+- Repository tests include both fake-provider thread contracts, durable replay after reopening the state store, a real temporary Markdown Task Card create/read/update cycle through T014, an assertion that Task Card body content is absent from Forge state, and an assertion that handoff creation leaves `dispatches` empty.
+
+## Remaining Machine-level Acceptance
+
+One small local-provider smoke remains before `PASS`:
+
+1. open one OpenCode main thread in a registered real project, send a harmless read-only question, then send a second message and confirm the same OpenCode session continues;
+2. repeat once with Codex and confirm the second turn reports/resumes the same Codex thread ID;
+3. refresh the Web surface between turns and confirm the normalized conversation history replays.
+
+This check is intentionally limited to provider/binary behavior that repository CI cannot authenticate or reproduce. It must not require recreating internal batches, hand-writing API calls, or exercising Builder dispatch.
 
 ## Out of Scope
 
