@@ -17,7 +17,7 @@
 | T013 | One-step First-run Check | PASS | Disposable real-OpenCode diagnostic + API/UI + timeout/session/marker tests + fake-OpenCode E2E; Verify #63 |
 | T014 | Repository-native Task Source Spike | PASS | Repo Markdown inspect/resolve/create/update, workspace bounds, no runtime Task Card copy; Verify #89 |
 | T015 | Main Thread Runtime for Codex and OpenCode | PASS | OpenCode two-turn + refresh replay passed; Codex Desktop real two-turn continuation passed after app-server sandbox fix; provider contracts + live process UI verified; Verify #139; UI polish deferred |
-| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | REVIEW | Shared Builder contract + deterministic adapter/dispatch verification passed (Verify #157, PR #6), but human product-loop acceptance is still open: current Web dispatch UI is hard-wired to OpenCode and PiAgent/Codex have not completed a real Forge dispatch → provider execution → runtime evidence → task `reviewing` loop on the user's machine |
+| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | REVIEW | Shared Builder contract + deterministic adapter/dispatch verification (Verify #157, PR #6); PR #9 adds repo Task Source → Batch UI, authoritative taskRef resolution and OpenCode/PiAgent/Codex Builder selector (Verify #178). Remaining acceptance: one human Mac Forge UI → real PiAgent/Codex execution → runtime evidence → durable task `reviewing` loop + refresh replay |
 | T017 | Compact Mira Web UI | TODO | Unblocked by T015 PASS; Mira accent, compact restrained layout, English-only UI; T015 smoke UI findings belong here |
 | T018 | Live Runtime Surface | TODO | Depends on T016 + T017 PASS; compact live agent/task/session/runtime information |
 

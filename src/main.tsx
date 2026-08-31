@@ -4,6 +4,7 @@ import App from './App'
 import MainThreadPanel from './MainThreadPanel'
 import ShortcutFeedback from './ShortcutFeedback'
 import './styles.css'
+import './t016-builder-ui.css'
 import './visual-restraint.css'
 
 createRoot(document.getElementById('root')!).render(
