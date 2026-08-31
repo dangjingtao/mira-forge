@@ -15,6 +15,8 @@ type AcceptanceResult = {
   workspaceDisposable: boolean
 }
 
+const backgroundShortcuts = new Set(['j', 'k', 'r', 'n', '/', 'q', 'd', 'x', 'a', 'ArrowDown', 'ArrowUp'])
+
 function FirstRunCheck() {
   const [open, setOpen] = useState(false)
   const [running, setRunning] = useState(false)
@@ -25,20 +27,32 @@ function FirstRunCheck() {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement
       const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-      if (event.key === 'Escape' && open && !running) {
-        event.preventDefault()
-        setOpen(false)
+
+      if (open) {
+        if (event.key === 'Escape' && !running) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          setOpen(false)
+          return
+        }
+        if (!typing && backgroundShortcuts.has(event.key)) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          return
+        }
         return
       }
-      if (!typing && event.key === 'a' && !open) {
+
+      if (!typing && event.key === 'a') {
         event.preventDefault()
+        event.stopImmediatePropagation()
         setOpen(true)
         setRequestError('')
       }
     }
 
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [open, running])
 
   async function runCheck(event: FormEvent<HTMLFormElement>) {
