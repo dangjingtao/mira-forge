@@ -19,8 +19,8 @@ Managed Projects / Task Cards
    |         Dispatch Attempts -- Runtime Events
    |                 |
    |             Process Runner
-   |                 |
-   |          OpenCode local adapter
+   |            /       |       \
+   |       OpenCode   PiAgent   Codex Desktop
    |
    +-- Main Threads -- Thread Events
    |       |             |
@@ -115,7 +115,7 @@ OpenCode main threads run with the `plan` agent and a runtime permission overrid
 Codex has two separate main-thread adapters rather than pretending every local Codex client is the same transport:
 
 - `codex-desktop` discovers the Codex backend bundled in the current macOS `ChatGPT.app` or legacy `Codex.app` (or uses `MIRA_FORGE_CODEX_DESKTOP_BIN`) and launches its documented `app-server` JSONL transport. Forge performs the required `initialize` / `initialized` handshake, uses `thread/start` or exact-ID `thread/resume`, then `turn/start` with `approvalPolicy: never` and a read-only sandbox. The resulting Codex thread is persisted in the same Codex home used by the desktop product; Forge does not scrape the desktop UI or attach to a private stdio process owned by the running app.
-- `codex` remains the standalone CLI path and uses `codex exec --json --sandbox read-only --ask-for-approval never`.
+- `codex` remains the standalone CLI path and uses `codex exec --json` with a read-only sandbox and non-interactive approval policy.
 
 Both Codex paths require an exact resume identity. A different returned thread ID is failure rather than a silently substituted conversation. Provider-reported file changes are treated as a main-thread contract violation.
 
@@ -131,9 +131,15 @@ Adapters describe capabilities and liveness. Core state does not depend on a par
 
 Builder and Reviewer sessions bind an adapter to one project/batch/task execution. Session lifecycle is durable and independent from task engineering state. Completing or disconnecting a session does not erase task state or previous sessions.
 
-A dispatch attempt is the durable evidence that Forge explicitly tried to launch a Builder for a ready task. Provider-specific CLI/process behavior lives behind a runner adapter. The first implementation uses local `opencode run --format json --dir <projectRoot>`.
+A dispatch attempt is the durable evidence that Forge explicitly tried to launch a Builder for a ready task. Provider-specific CLI/process behavior lives behind a runner adapter. T016 exposes three built-in product-level Builder choices behind that boundary:
 
-For first use, one Builder adapter supervises only one active dispatch at a time. Parallel Builder execution is deferred until scheduler/worktree contracts exist; this prevents a completed child from falsely marking a still-running shared adapter available and avoids unmanaged working-tree contention.
+- `opencode` preserves the verified `opencode run --format json --dir <projectRoot>` path;
+- `piagent` uses Pi's non-interactive JSON-lines mode and observes its session header/tool lifecycle without copying raw streams into durable state;
+- `codex` reuses the executable bundled with Codex/ChatGPT Desktop by default and runs bounded `workspace-write` non-interactive construction without requiring a separately installed PATH CLI.
+
+The dispatch request may name a product-level `builder`/`preferredBuilder`, while durable sessions and dispatches bind the resolved adapter ID. Explicit custom Builder adapter IDs remain possible and do not change the core state schema.
+
+For first use, Forge allows only one active Builder dispatch globally across adapter choices. Parallel Builder execution is deferred until scheduler/worktree contracts exist; merely adding providers must not accidentally create concurrent unmanaged write lanes. This also prevents a completed child from falsely making a shared construction surface appear free while another Builder is still running.
 
 Forge never treats child-process success as review PASS. Successful construction closes the Builder session and moves the task into the review stage only.
 
@@ -147,7 +153,7 @@ The local control process owns live child-process handles. Durable state records
 - startup reconciliation marks leftover starting/running attempts interrupted and their sessions disconnected;
 - late terminal callbacks cannot overwrite an already terminal dispatch.
 
-The OpenCode Builder adapter parses JSONL defensively and captures the first observed external `sessionID`, while child-process exit remains the authoritative completion signal.
+Builder adapters parse provider output defensively and publish only bounded normalized evidence. OpenCode's existing `sessionID`, Pi's JSON session header ID and Codex's reported thread ID all map to the same optional `externalSessionId` field when observed. Malformed provider lines are ignored instead of crashing the control plane. Provider-reported terminal errors are failure evidence even when a wrapper process exits zero.
 
 Main-thread turns use the smaller T015 provider runner contract rather than the Builder supervision contract. Their durable continuation point is the external provider thread/session ID; a control-plane restart reconciles an in-flight turn as interrupted instead of adopting an unknown child process.
 
@@ -174,7 +180,7 @@ For the current milestone:
 - a task with an active Builder session is blocked;
 - missing, self and cyclic dependency references are invalid;
 - multiple independent tasks may be reported ready together;
-- the execution layer may still apply the stricter first-use single-active-Builder policy;
+- the execution layer still applies the stricter first-use single-active-Builder policy across adapter choices;
 - parallel construction still does not imply parallel integration.
 
 Policy overrides for dependency satisfaction are intentionally deferred.
@@ -205,4 +211,4 @@ Policy overrides for dependency satisfaction are intentionally deferred.
 - `GET|PATCH /api/threads/:threadId/tasks/:taskId`
 - `POST /api/threads/:threadId/handoffs`
 
-Automatic Reviewer dispatch, Builder-adapter expansion, worktree scheduling, live streaming and parallel integration remain later milestones.
+Automatic Reviewer dispatch, worktree scheduling, richer live Builder streaming and parallel integration remain later milestones.
