@@ -18,6 +18,38 @@ function appendBounded(current, value, limit = MAX_CAPTURE) {
   return next.length <= limit ? next : next.slice(next.length - limit)
 }
 
+function reasoningText(value) {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (!Array.isArray(value)) return null
+  const parts = value.flatMap((item) => {
+    if (typeof item === 'string') return [item]
+    if (!item || typeof item !== 'object') return []
+    if (typeof item.text === 'string') return [item.text]
+    return []
+  }).map((item) => item.trim()).filter(Boolean)
+  return parts.length ? parts.join('\n') : null
+}
+
+function createProgressPublisher(onEvent) {
+  let chain = Promise.resolve()
+  let error = null
+  return {
+    publish(event) {
+      if (typeof onEvent !== 'function') return
+      chain = chain.then(() => onEvent(event)).catch((cause) => {
+        error ||= cause instanceof Error ? cause : new Error(String(cause))
+      })
+    },
+    async flush() {
+      await chain
+      if (error) throw error
+    },
+    streamed() {
+      return typeof onEvent === 'function'
+    },
+  }
+}
+
 export function parseMainThreadPrefixArgs(value, name = 'prefix args') {
   if (value === undefined || value === null || value === '') return []
   const parsed = typeof value === 'string' ? JSON.parse(value) : value
@@ -36,7 +68,7 @@ export function buildOpenCodeMainThreadArgs({
 }) {
   const root = requiredString(projectRoot, 'projectRoot')
   const prompt = requiredString(message, 'message')
-  const args = [...prefixArgs, 'run', '--format', 'json', '--dir', root, '--agent', 'plan']
+  const args = [...prefixArgs, 'run', '--format', 'json', '--thinking', '--dir', root, '--agent', 'plan']
   if (optionalString(externalThreadId)) args.push('--session', externalThreadId.trim())
   if (optionalString(model)) args.push('--model', model.trim())
   args.push(prompt)
@@ -83,6 +115,20 @@ export function normalizeOpenCodeThreadEvent(event) {
   if (!event || typeof event !== 'object') return null
   const part = event.part && typeof event.part === 'object' ? event.part : null
   const partType = optionalString(part?.type)
+  if (partType && ['reasoning', 'thinking'].includes(partType)) {
+    const text = optionalString(part?.text) || reasoningText(part?.summary) || optionalString(part?.content)
+    if (!text) return null
+    return {
+      type: 'thinking',
+      text,
+      provider: {
+        adapter: 'opencode',
+        eventType: optionalString(event.type),
+        itemType: partType,
+        status: optionalString(part?.state?.status) || optionalString(part?.status),
+      },
+    }
+  }
   if (partType && ['tool', 'tool_use', 'tool_result'].includes(partType)) {
     return {
       type: 'tool',
@@ -107,7 +153,21 @@ export function normalizeCodexThreadEvent(event) {
   const itemType = optionalString(item?.type)
   if (!itemType) return null
 
-  if (['command_execution', 'mcp_tool_call'].includes(itemType)) {
+  if (itemType === 'reasoning') {
+    const text = reasoningText(item?.summary) || reasoningText(item?.content) || optionalString(item?.text)
+    if (!text) return null
+    return {
+      type: 'thinking',
+      text,
+      provider: {
+        adapter: 'codex',
+        eventType: optionalString(event.type),
+        itemType,
+        status: optionalString(item?.status),
+      },
+    }
+  }
+  if (['command_execution', 'mcp_tool_call', 'web_search'].includes(itemType)) {
     return {
       type: 'tool',
       tool: {
@@ -229,6 +289,7 @@ export function createOpenCodeMainThreadAdapter({
     async runTurn(input) {
       const args = buildOpenCodeMainThreadArgs({ prefixArgs, ...input })
       const events = []
+      const progress = createProgressPublisher(input.onEvent)
       let responseText = ''
       let observedThreadId = null
       let providerError = null
@@ -265,9 +326,13 @@ export function createOpenCodeMainThreadAdapter({
           if (typeof apiError === 'string' && apiError.trim()) providerError = apiError.trim()
 
           const normalized = normalizeOpenCodeThreadEvent(event)
-          if (normalized && events.length < MAX_EVENTS) events.push(normalized)
+          if (normalized && events.length < MAX_EVENTS) {
+            events.push(normalized)
+            progress.publish(normalized)
+          }
         },
       })
+      await progress.flush()
 
       if (result.code !== 0) {
         throw new Error(providerError || result.stderr || `OpenCode exited with code ${result.code ?? 'unknown'}`)
@@ -282,7 +347,7 @@ export function createOpenCodeMainThreadAdapter({
       return {
         externalThreadId,
         responseText: responseText.trim(),
-        events,
+        events: progress.streamed() ? [] : events,
         providerEventType: 'opencode.turn.completed',
       }
     },
@@ -301,6 +366,7 @@ export function createCodexMainThreadAdapter({
     async runTurn(input) {
       const args = buildCodexMainThreadArgs({ prefixArgs, ...input })
       const events = []
+      const progress = createProgressPublisher(input.onEvent)
       let responseText = ''
       let observedThreadId = null
       let providerError = null
@@ -330,9 +396,13 @@ export function createCodexMainThreadAdapter({
           }
 
           const normalized = normalizeCodexThreadEvent(event)
-          if (normalized && events.length < MAX_EVENTS) events.push(normalized)
+          if (normalized && events.length < MAX_EVENTS) {
+            events.push(normalized)
+            progress.publish(normalized)
+          }
         },
       })
+      await progress.flush()
 
       if (result.code !== 0) {
         throw new Error(providerError || result.stderr || `Codex exited with code ${result.code ?? 'unknown'}`)
@@ -348,7 +418,7 @@ export function createCodexMainThreadAdapter({
       return {
         externalThreadId,
         responseText: responseText.trim(),
-        events,
+        events: progress.streamed() ? [] : events,
         providerEventType: 'codex.turn.completed',
       }
     },
