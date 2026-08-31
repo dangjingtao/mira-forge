@@ -5,6 +5,14 @@ import { homedir } from 'node:os'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createOpenCodeAcceptance } from './acceptance.mjs'
+import {
+  BUILDER_CHOICES,
+  BUILTIN_BUILDER_ADAPTER_IDS,
+  CODEX_ADAPTER_ID,
+  OPENCODE_ADAPTER_ID,
+  PIAGENT_ADAPTER_ID,
+} from './builder-contract.mjs'
+import { createCodexBuilderRunner, parseCodexBuilderPrefixArgs } from './codex-builder-adapter.mjs'
 import { createCodexDesktopMainThreadAdapter } from './codex-desktop-adapter.mjs'
 import {
   ADAPTER_KINDS,
@@ -24,7 +32,7 @@ import {
   updateTask,
 } from './domain.mjs'
 import { DISPATCH_STATUSES, getDispatches, getRuntimeEvents } from './dispatch-domain.mjs'
-import { createDispatchManager, OPENCODE_ADAPTER_ID } from './dispatch-manager.mjs'
+import { createDispatchManager } from './dispatch-manager.mjs'
 import {
   createCodexMainThreadAdapter,
   createOpenCodeMainThreadAdapter,
@@ -37,6 +45,7 @@ import {
 } from './main-thread-domain.mjs'
 import { createMainThreadManager } from './main-thread-manager.mjs'
 import { createOpenCodeRunner, parseOpenCodePrefixArgs } from './opencode-adapter.mjs'
+import { createPiAgentRunner, parsePiAgentPrefixArgs } from './piagent-adapter.mjs'
 import { DISPATCHABLE_TASK_STATUSES, getDispatchReadiness, validateBatchDependencies } from './readiness.mjs'
 import { createStore } from './store.mjs'
 
@@ -51,9 +60,21 @@ const openCodeRunner = createOpenCodeRunner({
   bin: process.env.MIRA_FORGE_OPENCODE_BIN || 'opencode',
   prefixArgs: parseOpenCodePrefixArgs(process.env.MIRA_FORGE_OPENCODE_PREFIX_ARGS),
 })
+const piAgentRunner = createPiAgentRunner({
+  bin: process.env.MIRA_FORGE_PIAGENT_BIN || 'pi',
+  prefixArgs: parsePiAgentPrefixArgs(process.env.MIRA_FORGE_PIAGENT_PREFIX_ARGS),
+})
+const codexBuilderRunner = createCodexBuilderRunner({
+  bin: process.env.MIRA_FORGE_CODEX_DESKTOP_BUILDER_BIN || process.env.MIRA_FORGE_CODEX_DESKTOP_BIN || null,
+  prefixArgs: parseCodexBuilderPrefixArgs(process.env.MIRA_FORGE_CODEX_BUILDER_PREFIX_ARGS),
+})
 const dispatchManager = createDispatchManager({
   store,
-  runners: new Map([[OPENCODE_ADAPTER_ID, openCodeRunner]]),
+  runners: new Map([
+    [OPENCODE_ADAPTER_ID, openCodeRunner],
+    [PIAGENT_ADAPTER_ID, piAgentRunner],
+    [CODEX_ADAPTER_ID, codexBuilderRunner],
+  ]),
 })
 const openCodeAcceptance = createOpenCodeAcceptance({
   runner: openCodeRunner,
@@ -199,7 +220,8 @@ const server = createServer(async (request, response) => {
         reviewStatuses: REVIEW_STATUSES,
         dispatchStatuses: DISPATCH_STATUSES,
         dispatchableTaskStatuses: DISPATCHABLE_TASK_STATUSES,
-        builtinBuilderAdapters: [OPENCODE_ADAPTER_ID],
+        builderChoices: BUILDER_CHOICES,
+        builtinBuilderAdapters: BUILTIN_BUILDER_ADAPTER_IDS,
         mainThreadAdapters: MAIN_THREAD_ADAPTERS,
         mainThreadStatuses: MAIN_THREAD_STATUSES,
         mainThreadEventTypes: MAIN_THREAD_EVENT_TYPES,
