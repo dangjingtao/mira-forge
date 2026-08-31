@@ -49,6 +49,22 @@ integrated
 
 The two layers are deliberately not the same state machine.
 
+## Repository-native task source
+
+A registered project may point Forge at its repository-owned Markdown task truth through `taskLedger` and `taskDir`. The repository Markdown task source in `server/repo-task-source.mjs` is deliberately thin:
+
+- inspect the configured ledger without mutating it;
+- resolve a task ID to a repository-relative Task Card reference;
+- explicitly create a Task Card and matching ledger row;
+- explicitly update Task Card title/status or replace validated Task Card content while keeping the ledger index aligned;
+- reject missing/malformed/ambiguous task truth instead of inventing it.
+
+Task-source reads and writes are bounded to the registered project root, including real-path checks for configured ledger/task directories and resolved Task Cards. Read operations never mutate repository truth. Write operations are explicit and use atomic per-file replacement with rollback of the Task Card when the ledger write fails.
+
+The normalized task-source result is a reference surface (`id`, title/status index data, `taskRef`, `ledgerRef`, bounded warnings), not another requirements database. Full Task Card content is never copied into `~/.mira-forge/state.json` by this contract. Runtime batches/tasks remain execution bindings rather than authoritative requirement records.
+
+T014 intentionally does not add a public HTTP task-management API. T015 consumes this module boundary from the main-thread runtime so the product flow can stabilize before another API surface is exposed.
+
 ## Durable runtime collections
 
 Default state file:

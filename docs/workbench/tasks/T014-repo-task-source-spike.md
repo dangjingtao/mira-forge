@@ -1,6 +1,6 @@
 # T014 — Repository-native Task Source Spike
 
-Status: TODO
+Status: PASS
 
 Base when card was created: `dev@95788258b289268527b9fea7ebbd051b2ff433ee`.
 
@@ -65,6 +65,31 @@ A thin adapter boundary is preferred, for example a repository Markdown task sou
 - Tests prove read, create/update and no-duplicate-runtime-state behavior.
 - Existing `npm run check` remains green.
 
+## Implementation / Evidence
+
+Implemented `server/repo-task-source.mjs` as a focused repository Markdown boundary with four operations:
+
+- `inspectRepositoryTaskSource(project)`
+- `resolveRepositoryTask(project, taskId)`
+- `createRepositoryTask(project, input)`
+- `updateRepositoryTask(project, taskId, patch)`
+
+The adapter requires the registered project to provide repository-relative `taskLedger` and `taskDir` references. It resolves real filesystem paths and rejects configuration or Task Cards that escape the registered project root. Read/inspect paths do not mutate files. Create/update are explicit writes; Task Card and ledger writes use atomic replacement, and create/update includes bounded rollback behavior when the ledger write fails.
+
+The normalized result contains repository references and small index metadata only; full Task Card content is not persisted into Forge runtime state. Ledger/card title or status drift is surfaced as a bounded warning rather than silently choosing invented truth.
+
+`server/repo-task-source.test.mjs` covers source inspection, Task ID resolution, structured create/update, full-content replacement, missing/malformed task truth, workspace-bound path rejection, escaped Markdown-table pipes, and a marker assertion proving Task Card body content is absent from Forge runtime state.
+
+Implementation commit: `16eee54ffd5d255bb3c51abd16eeb85da937f2d1`.
+
+Verify #89 passed `npm test`, `npm run typecheck`, `npm run build` and the existing smoke suite on `dev`.
+
+## Product Decision
+
+The spike validates repository-native Markdown as Forge's default task source. Repository Task Cards/ledger remain project truth; Forge runtime keeps execution bindings only.
+
+T014 intentionally does not add a public task-management HTTP API. T015 should consume this module boundary from the main-thread runtime first. A public API can be added later only if the real product flow needs it.
+
 ## Out of Scope
 
 - Main Agent chat/thread runtime.
@@ -75,8 +100,8 @@ A thin adapter boundary is preferred, for example a repository Markdown task sou
 
 ## Unknown / Human Decision
 
-None for the spike. If current repository task formats cannot support a minimal common contract without destructive assumptions, stop and report the concrete conflict rather than designing a large schema.
+None. The current repository task format supports the minimal common contract without destructive schema assumptions.
 
 ## Handoff
 
-Read the current repository and tests before editing. If current code contradicts this card, current repository facts win; report the conflict before widening scope.
+T015 is unblocked. Re-read current HEAD before implementation and consume the task-source module rather than duplicating Markdown parsing or Task Card content into thread/runtime state.

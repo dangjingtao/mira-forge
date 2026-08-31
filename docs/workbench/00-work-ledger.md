@@ -15,8 +15,8 @@
 | T011 | Process supervision and runtime events | PASS | Success/failure/cancel/restart/shutdown supervision tests + dispatch smoke; Verify #51 |
 | T012 | TUI dispatch wiring | REVIEW | Keyboard dispatch/cancel/runtime UI verified in repository; first normal real-project dispatch will close observational acceptance |
 | T013 | One-step First-run Check | PASS | Disposable real-OpenCode diagnostic + API/UI + timeout/session/marker tests + fake-OpenCode E2E; Verify #63 |
-| T014 | Repository-native Task Source Spike | TODO | Validate repo Markdown ledger/Task Card as authoritative task truth before expanding the product flow |
-| T015 | Main Thread Runtime for Codex and OpenCode | TODO | Depends on T014 PASS; durable main/dispatch thread + Task Card handoff |
+| T014 | Repository-native Task Source Spike | PASS | Repo Markdown inspect/resolve/create/update, workspace bounds, no runtime Task Card copy; Verify #89 |
+| T015 | Main Thread Runtime for Codex and OpenCode | TODO | T014 PASS; durable main/dispatch thread + Task Card handoff now unblocked |
 | T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | TODO | Depends on T015 PASS; provider-neutral construction-thread adapter expansion |
 | T017 | Compact Mira Web UI | TODO | Depends on T015 PASS; Mira accent, compact restrained layout, English-only UI |
 | T018 | Live Runtime Surface | TODO | Depends on T016 + T017 PASS; compact live agent/task/session/runtime information |
