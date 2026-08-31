@@ -26,7 +26,6 @@ test('PiAgent args use deterministic JSON print mode without permission bypass f
     '--no-session',
     '--model',
     'provider/model',
-    '--',
     'Do T016',
   ])
   assert.equal(args.some((value) => /bypass|dangerous/i.test(value)), false)
