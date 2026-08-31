@@ -1,6 +1,6 @@
 # T017 — Compact Mira Web UI
 
-Status: REVIEW
+Status: PASS
 
 Depends on: T015 PASS.
 
@@ -100,7 +100,7 @@ The intended result is a mostly neutral engineering workbench with Mira orange u
 - Human visual smoke on 2026-08-31 identified two follow-ups before PASS: orange usage is too broad, and Main Thread collapse/expand arrows should become `− / +`.
 - Visual restraint follow-up merged to `dev` through PR `#8` at squash commit `c97bfdf597cb7fdc5eb94a85a3829285a0690548`.
 - PR `#8` Verify run `33382968808` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
-- T017 remains `REVIEW` until the merged visual follow-up is visually accepted in the browser.
+- Human browser visual smoke accepted the restrained accent pass and `− / +` collapse control on 2026-08-31.
 
 ## Out of Scope
 
@@ -116,4 +116,4 @@ Resolved for T017: the canonical Mira primary was read from the current Mira vis
 
 ## Handoff
 
-The visual restraint pass and `− / +` Main Thread collapse control are merged to `dev` and automated checks are green. Repeat the short browser visual smoke; only after human acceptance should T017 move to PASS and unblock T018.
+T017 PASS. The compact restrained visual system is accepted and T018 is unblocked.
