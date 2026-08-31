@@ -17,7 +17,7 @@
 | T013 | One-step First-run Check | PASS | Disposable real-OpenCode diagnostic + API/UI + timeout/session/marker tests + fake-OpenCode E2E; Verify #63 |
 | T014 | Repository-native Task Source Spike | PASS | Repo Markdown inspect/resolve/create/update, workspace bounds, no runtime Task Card copy; Verify #89 |
 | T015 | Main Thread Runtime for Codex and OpenCode | PASS | OpenCode two-turn + refresh replay passed; Codex Desktop real two-turn continuation passed after app-server sandbox fix; provider contracts + live process UI verified; Verify #139; UI polish deferred |
-| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | REVIEW | OpenCode/PiAgent/Codex shared Builder contract implemented with cross-provider serial gate, fake protocol fixtures and disposable real-machine smoke helper; awaiting repository Verify |
+| T016 | Builder Thread Adapters for OpenCode, PiAgent and Codex | PASS | Shared Builder contract + OpenCode regression + PiAgent/Codex fake protocol fixtures + cross-provider serial gate + disposable machine smoke helper; Verify #157; PR #6 |
 | T017 | Compact Mira Web UI | TODO | Unblocked by T015 PASS; Mira accent, compact restrained layout, English-only UI; T015 smoke UI findings belong here |
 | T018 | Live Runtime Surface | TODO | Depends on T016 + T017 PASS; compact live agent/task/session/runtime information |
 
