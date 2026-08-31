@@ -68,7 +68,7 @@ export function buildCodexBuilderArgs({ prefixArgs = [], projectRoot, prompt, mo
     '--json',
     '--sandbox',
     'workspace-write',
-    '-C',
+    '--cd',
     projectRoot,
   ]
   if (optionalString(model)) args.push('--model', model.trim())
