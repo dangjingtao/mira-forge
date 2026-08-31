@@ -1,6 +1,6 @@
 # T017 — Compact Mira Web UI
 
-Status: TODO
+Status: PASS
 
 Depends on: T015 PASS.
 
@@ -70,6 +70,16 @@ Use the repository/current Mira visual source if a canonical primary color is al
 - No major layout jumping is introduced by polling/state changes.
 - `npm run typecheck`, `npm run build` and existing smoke verification remain green.
 
+## Delivery Evidence
+
+- Branch: `task/T017-compact-mira-web-ui` from `dev`.
+- PR: `#5` — `T017 compact Mira web UI`.
+- Mira accent uses the verified current primary `#FA7328` with hover `#E86A21`.
+- Main Thread is integrated into the main work surface as a persistent right rail; under `1180px` it becomes an integrated lower region instead of covering the control plane as a floating utility window.
+- Existing project/task keyboard interactions, thread actions, dispatch/cancel contracts and provider/runtime APIs were not changed.
+- The current `dev` choice to leave the First-run Check launcher entry unmounted is preserved; its dormant UI remains styled and the remaining Chinese diagnostic label was replaced with English.
+- GitHub Actions Verify run `33363256907` passed on head `e8d35d75c8823553120d3a74e189e0a1672f53fd` before this ledger-only update. The job passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
+
 ## Out of Scope
 
 - New runtime event semantics.
@@ -80,8 +90,8 @@ Use the repository/current Mira visual source if a canonical primary color is al
 
 ## Unknown / Human Decision
 
-Canonical Mira primary color must be verified from an existing project/design source before implementation if it is not already present in this repository. Do not substitute an invented hue.
+Resolved for T017: the canonical Mira primary was read from the current Mira visual source and applied as `#FA7328`; no new brand hue was invented.
 
 ## Handoff
 
-Treat this as product UI refinement, not a dashboard redesign contest. Preserve proven interactions, reduce visual weight and make information hierarchy do the work.
+T017 establishes the compact product shell and visual token layer. T018 can add richer live-runtime information inside these regions without reopening T014-T016 runtime contracts.
