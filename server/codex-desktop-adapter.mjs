@@ -7,6 +7,7 @@ import { join } from 'node:path'
 const MAX_CAPTURE = 32_768
 const MAX_STDERR = 8192
 const MAX_EVENTS = 64
+const CODEX_DESKTOP_READ_ONLY_MODE = 'read-only'
 
 function requiredString(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`)
@@ -101,7 +102,9 @@ export function buildCodexDesktopThreadRequest({ projectRoot, externalThreadId, 
   const params = {
     cwd,
     approvalPolicy: 'never',
-    sandbox: 'readOnly',
+    // thread/start and thread/resume use SandboxMode (kebab-case), not
+    // the turn-level SandboxPolicy object discriminator.
+    sandbox: CODEX_DESKTOP_READ_ONLY_MODE,
   }
   if (optionalString(model)) params.model = model.trim()
   if (threadId) {
@@ -125,6 +128,7 @@ export function buildCodexDesktopTurnRequest({ projectRoot, threadId, message, m
     input: [{ type: 'text', text }],
     cwd,
     approvalPolicy: 'never',
+    // turn/start uses SandboxPolicy, whose discriminator is camelCase.
     sandboxPolicy: { type: 'readOnly' },
   }
   if (optionalString(model)) params.model = model.trim()
