@@ -141,7 +141,7 @@ test('Codex Desktop thread and turn requests stay non-interactive and read-only'
     params: {
       cwd: '/repo',
       approvalPolicy: 'never',
-      sandbox: 'readOnly',
+      sandbox: 'read-only',
       model: 'gpt-5.6-sol',
       threadId: 'thr-9',
       excludeTurns: true,
@@ -205,7 +205,7 @@ test('Codex Desktop adapter speaks app-server JSONL and returns a durable thread
   assert.equal(initialize.params.clientInfo.name, 'mira_forge')
   assert.equal(capture.messages.some((message) => message.method === 'initialized'), true)
   const threadStart = capture.messages.find((message) => message.method === 'thread/start')
-  assert.equal(threadStart.params.sandbox, 'readOnly')
+  assert.equal(threadStart.params.sandbox, 'read-only')
   const turnStart = capture.messages.find((message) => message.method === 'turn/start')
   assert.deepEqual(turnStart.params.sandboxPolicy, { type: 'readOnly' })
 })
@@ -227,5 +227,6 @@ test('Codex Desktop adapter resumes the exact prior app-server thread', async ()
   assert.equal(result.externalThreadId, 'thr-desktop-1')
   const resume = capture.messages.find((message) => message.method === 'thread/resume')
   assert.equal(resume.params.threadId, 'thr-desktop-1')
+  assert.equal(resume.params.sandbox, 'read-only')
   assert.equal(capture.messages.some((message) => message.method === 'thread/start'), false)
 })
