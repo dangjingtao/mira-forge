@@ -21,7 +21,7 @@ type MainThread = {
 
 type ThreadEvent = {
   id: string
-  type: 'message' | 'tool' | 'status' | 'artifact' | 'handoff'
+  type: 'message' | 'thinking' | 'tool' | 'status' | 'artifact' | 'handoff'
   role: string | null
   text: string | null
   tool: { name: string; status: string | null } | null
@@ -40,6 +40,18 @@ type ThreadSnapshot = {
   events: ThreadEvent[]
 }
 
+type ThreadTurn = {
+  id: string
+  user: ThreadEvent
+  process: ThreadEvent[]
+  assistant: ThreadEvent | null
+  complete: boolean
+}
+
+type TimelineEntry =
+  | { kind: 'turn'; turn: ThreadTurn }
+  | { kind: 'event'; event: ThreadEvent }
+
 function parseErrorBody(body: unknown, fallback: string) {
   if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') return body.message
   return fallback
@@ -47,10 +59,72 @@ function parseErrorBody(body: unknown, fallback: string) {
 
 function eventLabel(event: ThreadEvent) {
   if (event.type === 'message') return event.role || 'message'
+  if (event.type === 'thinking') return 'thinking'
   if (event.type === 'tool') return event.tool?.name || 'tool'
   if (event.type === 'artifact') return event.artifact?.kind || 'artifact'
   if (event.type === 'handoff') return `handoff · ${event.handoff?.taskId || 'task'}`
   return event.text || 'status'
+}
+
+function isTerminalStatus(event: ThreadEvent) {
+  return event.type === 'status'
+    && Boolean(event.text && (
+      event.text.startsWith('turn.completed')
+      || event.text.startsWith('turn.failed')
+      || event.text.startsWith('turn.interrupted')
+    ))
+}
+
+function buildTimeline(events: ThreadEvent[]) {
+  const timeline: TimelineEntry[] = []
+  let current: ThreadTurn | null = null
+
+  for (const event of events) {
+    if (event.type === 'message' && event.role === 'user') {
+      current = {
+        id: event.id,
+        user: event,
+        process: [],
+        assistant: null,
+        complete: false,
+      }
+      timeline.push({ kind: 'turn', turn: current })
+      continue
+    }
+
+    if (!current) {
+      timeline.push({ kind: 'event', event })
+      continue
+    }
+
+    if (event.type === 'message' && event.role === 'assistant') {
+      current.assistant = event
+      continue
+    }
+
+    current.process.push(event)
+    if (isTerminalStatus(event)) {
+      current.complete = true
+      current = null
+    }
+  }
+
+  return timeline
+}
+
+function ThreadEventView({ event }: { event: ThreadEvent }) {
+  return (
+    <div className={`main-thread-event event-${event.type} role-${event.role || 'system'}`}>
+      <span>{eventLabel(event)}</span>
+      {(event.type === 'message' || event.type === 'thinking') && <p>{event.text}</p>}
+      {event.type === 'handoff' && event.handoff && (
+        <p>{event.handoff.taskRef} → {event.handoff.preferredBuilder}</p>
+      )}
+      {event.type === 'artifact' && event.artifact?.ref && <p>{event.artifact.ref}</p>}
+      {event.type === 'tool' && <p>{event.tool?.status || 'running'}</p>}
+      {event.type === 'status' && <p>{event.text}</p>}
+    </div>
+  )
 }
 
 function MainThreadPanel() {
@@ -62,6 +136,7 @@ function MainThreadPanel() {
   const [snapshot, setSnapshot] = useState<ThreadSnapshot | null>(null)
   const [adapter, setAdapter] = useState<'opencode' | 'codex'>('opencode')
   const [model, setModel] = useState('')
+  const [draft, setDraft] = useState('')
   const [creating, setCreating] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -115,13 +190,15 @@ function MainThreadPanel() {
   useEffect(() => {
     void loadSnapshot(threadId).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
     if (!threadId) return
+    const live = sending || snapshot?.thread.status === 'running'
     const timer = window.setInterval(() => {
       void loadSnapshot(threadId).catch(() => undefined)
-    }, 2500)
+    }, live ? 450 : 2500)
     return () => window.clearInterval(timer)
-  }, [loadSnapshot, threadId])
+  }, [loadSnapshot, sending, snapshot?.thread.status, threadId])
 
-  const visibleEvents = useMemo(() => snapshot?.events.slice(-80) ?? [], [snapshot?.events])
+  const visibleEvents = useMemo(() => snapshot?.events.slice(-100) ?? [], [snapshot?.events])
+  const timeline = useMemo(() => buildTimeline(visibleEvents), [visibleEvents])
 
   async function createThread(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -154,10 +231,10 @@ function MainThreadPanel() {
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!threadId) return
-    const form = new FormData(event.currentTarget)
-    const message = String(form.get('message') || '').trim()
+    const message = draft.trim()
     if (!message) return
 
+    setDraft('')
     setSending(true)
     try {
       const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
@@ -168,9 +245,9 @@ function MainThreadPanel() {
       const body = await response.json()
       if (!response.ok) throw new Error(parseErrorBody(body, `HTTP ${response.status}`))
       setSnapshot(body as ThreadSnapshot)
-      event.currentTarget.reset()
       setError('')
     } catch (cause) {
+      setDraft(message)
       setError(cause instanceof Error ? cause.message : String(cause))
       await loadSnapshot(threadId).catch(() => undefined)
     } finally {
@@ -211,7 +288,7 @@ function MainThreadPanel() {
             <form className="main-thread-create" onSubmit={createThread}>
               <select value={adapter} onChange={(event) => setAdapter(event.target.value as 'opencode' | 'codex')}>
                 <option value="opencode">OpenCode</option>
-                <option value="codex">Codex</option>
+                <option value="codex">Codex CLI</option>
               </select>
               <input value={model} onChange={(event) => setModel(event.target.value)} placeholder="model · optional" />
               <button type="submit" disabled={creating}>{creating ? 'opening…' : 'open thread'}</button>
@@ -219,20 +296,26 @@ function MainThreadPanel() {
           )}
 
           <div className="main-thread-stream" aria-live="polite">
-            {visibleEvents.length === 0 ? (
+            {timeline.length === 0 ? (
               <div className="main-thread-empty">Open a durable main thread to discuss, inspect and plan this project.</div>
-            ) : visibleEvents.map((event) => (
-              <div className={`main-thread-event event-${event.type} role-${event.role || 'system'}`} key={event.id}>
-                <span>{eventLabel(event)}</span>
-                {event.type === 'message' && <p>{event.text}</p>}
-                {event.type === 'handoff' && event.handoff && (
-                  <p>{event.handoff.taskRef} → {event.handoff.preferredBuilder}</p>
-                )}
-                {event.type === 'artifact' && event.artifact?.ref && <p>{event.artifact.ref}</p>}
-                {event.type === 'tool' && event.tool?.status && <p>{event.tool.status}</p>}
-                {event.type === 'status' && <p>{event.text}</p>}
-              </div>
-            ))}
+            ) : timeline.map((entry) => {
+              if (entry.kind === 'event') return <ThreadEventView event={entry.event} key={entry.event.id} />
+              const { turn } = entry
+              return (
+                <div className="main-thread-turn" key={turn.id}>
+                  <ThreadEventView event={turn.user} />
+                  {turn.process.length > 0 && (
+                    <details className="main-thread-process" open={!turn.complete}>
+                      <summary>{turn.complete ? `process · ${turn.process.length}` : 'thinking / execution…'}</summary>
+                      <div>
+                        {turn.process.map((processEvent) => <ThreadEventView event={processEvent} key={processEvent.id} />)}
+                      </div>
+                    </details>
+                  )}
+                  {turn.assistant && <ThreadEventView event={turn.assistant} />}
+                </div>
+              )
+            })}
           </div>
 
           {error && <div className="main-thread-error">! {error}</div>}
@@ -241,12 +324,24 @@ function MainThreadPanel() {
             <textarea
               name="message"
               rows={2}
-              placeholder={threadId ? 'Message the main thread…' : 'Open a thread first'}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.ctrlKey) {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
+              placeholder={threadId ? 'Message the main thread… · Ctrl+Enter to send' : 'Open a thread first'}
               disabled={!threadId || sending || snapshot?.thread.status === 'running'}
               required
             />
-            <button type="submit" disabled={!threadId || sending || snapshot?.thread.status === 'running'}>
-              {sending || snapshot?.thread.status === 'running' ? 'running…' : 'send ↵'}
+            <button
+              type="submit"
+              title="Send · Ctrl+Enter"
+              disabled={!threadId || sending || snapshot?.thread.status === 'running'}
+            >
+              {sending || snapshot?.thread.status === 'running' ? 'running…' : 'send ^↵'}
             </button>
           </form>
         </>
