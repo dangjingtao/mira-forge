@@ -24,7 +24,9 @@ Managed Projects / Task Cards
    |
    +-- Main Threads -- Thread Events
    |       |             |
-   |   Codex/OpenCode    +-- message/tool/status/artifact/handoff
+   |   OpenCode /        +-- message/thinking/tool/status/artifact/handoff
+   |   Codex Desktop /
+   |   Codex CLI
    |       |
    |       +-- explicit Task Source capabilities
    \
@@ -89,7 +91,7 @@ Schema version 1 contains additive collections for:
 - `dispatches`: durable Builder dispatch attempts and bounded terminal evidence;
 - `events`: append-only Builder/runtime milestones used by the control surface;
 - `threads`: durable project main/dispatch conversations, separate from Builder/Reviewer sessions;
-- `threadEvents`: bounded normalized `message / tool / status / artifact / handoff` history.
+- `threadEvents`: bounded normalized `message / thinking / tool / status / artifact / handoff` history.
 
 Older schema-1 files that do not contain later additive arrays remain readable.
 
@@ -102,13 +104,22 @@ A main thread is a durable project conversation for discussion, inspection, plan
 The provider-neutral minimum contract is:
 
 - one registered project;
-- one `codex` or `opencode` adapter selection;
+- one `opencode`, `codex-desktop`, or `codex` adapter selection;
 - durable user/assistant messages plus bounded normalized provider events;
 - an external provider thread/session ID when the provider supports durable continuation;
 - explicit repository-task capabilities implemented through `server/repo-task-source.mjs`;
 - explicit dispatch handoff containing only `projectId + taskId + taskRef + preferredBuilder`.
 
-OpenCode main threads run with the `plan` agent and a runtime permission override that denies everything by default while allowing read-oriented inspection tools. Codex main threads run through `codex exec --json` with `--sandbox read-only --ask-for-approval never`. A Codex resume must report the exact requested thread ID; a different ID is treated as failure rather than silently accepting a new conversation. Provider-reported file changes are also treated as a main-thread contract violation.
+OpenCode main threads run with the `plan` agent and a runtime permission override that denies everything by default while allowing read-oriented inspection tools.
+
+Codex has two separate main-thread adapters rather than pretending every local Codex client is the same transport:
+
+- `codex-desktop` discovers the Codex backend bundled in the current macOS `ChatGPT.app` or legacy `Codex.app` (or uses `MIRA_FORGE_CODEX_DESKTOP_BIN`) and launches its documented `app-server` JSONL transport. Forge performs the required `initialize` / `initialized` handshake, uses `thread/start` or exact-ID `thread/resume`, then `turn/start` with `approvalPolicy: never` and a read-only sandbox. The resulting Codex thread is persisted in the same Codex home used by the desktop product; Forge does not scrape the desktop UI or attach to a private stdio process owned by the running app.
+- `codex` remains the standalone CLI path and uses `codex exec --json --sandbox read-only --ask-for-approval never`.
+
+Both Codex paths require an exact resume identity. A different returned thread ID is failure rather than a silently substituted conversation. Provider-reported file changes are treated as a main-thread contract violation.
+
+The desktop adapter deliberately launches a short-lived app-server process from the desktop bundle instead of depending on the currently undocumented/shared-daemon startup switch. This avoids making Forge correctness depend on whether a particular desktop release exposes its private app-server. A Codex thread actively owned for writing by another app-server can still reject resume; Forge surfaces that provider error rather than stealing ownership.
 
 Task-source writes and dispatch handoffs are separate explicit Forge capabilities. A model response cannot create a Task Card or launch a Builder merely by mentioning one. Handoff creation records a reference event only; existing dispatch readiness and dispatch APIs remain the authority for actual construction.
 
