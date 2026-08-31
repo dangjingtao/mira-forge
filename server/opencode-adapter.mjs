@@ -64,6 +64,7 @@ export function createOpenCodeRunner({
       let stdoutBuffer = ''
       let stderr = ''
       let resultText = ''
+      let errorText = ''
 
       const consumeLine = (line) => {
         const event = parseOpenCodeJsonLine(line)
@@ -72,6 +73,8 @@ export function createOpenCodeRunner({
           ? event.part.text
           : typeof event.text === 'string' ? event.text : ''
         if (text) resultText = appendBounded(resultText, `${text}\n`)
+        const apiError = event?.error?.data?.message || event?.error?.message
+        if (typeof apiError === 'string' && apiError.trim()) errorText = appendBounded(errorText, apiError.trim())
         input.onEvent?.(event)
       }
 
@@ -111,6 +114,7 @@ export function createOpenCodeRunner({
           signal: typeof signal === 'string' ? signal : null,
           stderr,
           resultText: resultText.trim() || null,
+          errorText: errorText.trim() || null,
         })
       })
 

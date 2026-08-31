@@ -1,17 +1,20 @@
 # Mira Forge Third Wave — First Real Dispatch
 
-Status: READY FOR MANUAL ACCEPTANCE on `feat/dispatch-opencode`
+Status: MERGED INTO `dev`; V1 HUMAN ACCEPTANCE IN PROGRESS
+
+The current V1-wide acceptance decision and the reduced human gate are tracked in `docs/v1-status.md`.
 
 Goal: make Forge useful for its first real construction run without expanding into automatic review, merge, deployment, or parallel integration.
 
 Current status:
 
 1. T009 Dispatch request and durable attempt — PASS
-2. T010 OpenCode local Builder adapter — REVIEW (real local `opencode` binary acceptance pending)
+2. T010 OpenCode local Builder adapter — REVIEW (actual local provider/configuration acceptance pending)
 3. T011 Process supervision and runtime events — PASS
-4. T012 TUI dispatch wiring — REVIEW (repository verification passed; real local UI dispatch/cancel acceptance pending)
+4. T012 TUI dispatch wiring — REVIEW (first normal real-project dispatch remains observational acceptance)
+5. T013 One-step First-run Check — PASS
 
-Verify #57 passes tests, typecheck, build, the original control-plane/readiness smoke, and the fake-OpenCode dispatch smoke on the TUI-wired branch.
+Verify #63 passes tests, typecheck, build, the control-plane/readiness smoke, the fake-OpenCode dispatch smoke, and the First-run Check path on `dev`.
 
 ## First-use policy
 
@@ -27,4 +30,4 @@ A successful Builder process exit means construction execution finished; it does
 
 ## Remaining manual acceptance
 
-Run one harmless task through the TUI using the actual locally installed `opencode` executable. Confirm queued/started/session-bound/terminal evidence appears, selection survives polling, and an active dispatch can be explicitly cancelled. T010 and T012 remain `REVIEW` until that machine-level check passes.
+Run the First-run Check once with the actual locally installed `opencode` executable. Then observe the first normal real-project task dispatch through the TUI. T010 closes on a First-run Check `PASS`; T012 closes observationally when selection, explicit dispatch, runtime evidence, and review-stage landing are observed. Cancellation remains covered by automated race/supervision tests and may be accepted when naturally exercised.

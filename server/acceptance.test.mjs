@@ -76,3 +76,44 @@ test('OpenCode first-run check times out and terminates the disposable run', asy
     await rm(baseDir, { recursive: true, force: true })
   }
 })
+
+test('OpenCode API errors become actionable first-run diagnostics', async () => {
+  const baseDir = await mkdtemp(join(tmpdir(), 'mira-forge-acceptance-test-'))
+  try {
+    const runner = {
+      start(input) {
+        queueMicrotask(() => {
+          input.onEvent?.({ error: { data: { message: 'Your account does not have a valid CodingPlan subscription' } } })
+          input.onExit?.({ code: 1, signal: null, stderr: '', resultText: null })
+        })
+        return { kill() { return true } }
+      },
+    }
+
+    const result = await createOpenCodeAcceptance({ runner, baseDir, timeoutMs: 1000 }).run()
+    assert.equal(result.ok, false)
+    assert.match(result.error, /Coding Plan/)
+    assert.match(result.diagnostic, /valid CodingPlan subscription/)
+  } finally {
+    await rm(baseDir, { recursive: true, force: true })
+  }
+})
+
+test('invalid provider model errors are explained instead of reported as server errors', async () => {
+  const baseDir = await mkdtemp(join(tmpdir(), 'mira-forge-acceptance-test-'))
+  try {
+    const runner = {
+      start(input) {
+        queueMicrotask(() => {
+          input.onEvent?.({ error: { data: { message: 'ProviderModelNotFoundError: Model not found: qwen3.8-max/.' } } })
+          input.onExit?.({ code: 1, signal: null, stderr: '', resultText: null })
+        })
+        return { kill() { return true } }
+      },
+    }
+    const result = await createOpenCodeAcceptance({ runner, baseDir, timeoutMs: 1000 }).run()
+    assert.match(result.error, /模型配置无效/)
+  } finally {
+    await rm(baseDir, { recursive: true, force: true })
+  }
+})

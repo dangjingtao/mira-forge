@@ -24,16 +24,17 @@ Second wave implemented and verified on `dev`:
 - dependency validation and read-only dispatch readiness;
 - active Builder-session dispatch gate.
 
-Third wave is ready for manual acceptance on `feat/dispatch-opencode`:
+Third wave is merged into `dev` and is in V1 human acceptance:
 
 - durable dispatch attempts and runtime events;
 - first local OpenCode Builder process adapter;
 - serial first-use Builder policy;
 - process success/failure/cancel/restart/shutdown supervision;
 - keyboard-first TUI task selection, explicit dispatch/cancel, Builder busy state, and runtime-event history;
+- one-step disposable OpenCode First-run Check;
 - no automatic review PASS, push, merge or deployment.
 
-Repository verification passes through Verify #57. The remaining acceptance is one harmless dispatch through the UI using the user's actual locally installed `opencode` binary, including explicit cancel verification.
+Repository verification passes through Verify #63. The remaining acceptance is one First-run Check using the user's actual local `opencode` installation, followed by observational acceptance of the first normal real-project TUI dispatch.
 
 ## Run locally
 
@@ -135,6 +136,10 @@ Adapters, sessions, review handoffs, dispatch attempts and runtime events are ex
 See `docs/architecture.md` and `docs/workbench/00-work-ledger.md`.
 
 The dashboard interaction contract and keyboard event model are documented in `docs/tui-interaction.md`.
+
+The complete V1 acceptance snapshot is documented in `docs/v1-status.md`.
+
+New capability planning is tracked separately in `docs/v2-plan.md`; unfinished V1 acceptance is not moved there.
 
 ## Branches
 
