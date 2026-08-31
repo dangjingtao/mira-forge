@@ -29,11 +29,18 @@ test('main thread keeps a small durable normalized event history', () => {
   completeMainThreadTurn(state, thread.id, {
     externalThreadId: 'ses-1',
     responseText: 'The project is ready for planning.',
-    events: [{
-      type: 'tool',
-      tool: { name: 'read', status: 'completed' },
-      provider: { adapter: 'opencode', eventType: 'tool.completed', itemType: 'tool' },
-    }],
+    events: [
+      {
+        type: 'thinking',
+        text: 'checking the task ledger',
+        provider: { adapter: 'opencode', eventType: 'reasoning', itemType: 'reasoning' },
+      },
+      {
+        type: 'tool',
+        tool: { name: 'read', status: 'completed' },
+        provider: { adapter: 'opencode', eventType: 'tool.completed', itemType: 'tool' },
+      },
+    ],
   })
 
   assert.equal(thread.status, 'idle')
@@ -45,6 +52,7 @@ test('main thread keeps a small durable normalized event history', () => {
       ['assistant', 'The project is ready for planning.'],
     ],
   )
+  assert.equal(getMainThreadEvents(state, thread.id).some((event) => event.type === 'thinking'), true)
   assert.equal(getMainThreadEvents(state, thread.id).some((event) => event.type === 'tool'), true)
 })
 
