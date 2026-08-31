@@ -93,6 +93,48 @@ test('registered projects can keep durable main threads for OpenCode and Codex',
   }
 })
 
+test('provider progress is durable while a main-thread turn is still running', async () => {
+  const { store } = await fixture()
+  let releaseTurn
+  let progressPersisted
+  const release = new Promise((resolve) => { releaseTurn = resolve })
+  const observed = new Promise((resolve) => { progressPersisted = resolve })
+  const liveAdapter = {
+    id: 'opencode',
+    async runTurn(input) {
+      await input.onEvent({
+        type: 'thinking',
+        text: 'checking repository task state',
+        provider: { adapter: 'opencode', eventType: 'fixture.reasoning', itemType: 'reasoning' },
+      })
+      progressPersisted()
+      await release
+      return {
+        externalThreadId: 'opencode-live-1',
+        responseText: 'done',
+        events: [],
+        providerEventType: 'opencode.turn.completed',
+      }
+    },
+  }
+  const manager = createMainThreadManager({
+    store,
+    adapters: new Map([['opencode', liveAdapter]]),
+  })
+  const thread = await manager.openThread({ projectId: 'p1', adapter: 'opencode' })
+  const pending = manager.sendMessage(thread.id, { message: 'inspect' })
+
+  await observed
+  const live = await manager.getThread(thread.id)
+  assert.equal(live.thread.status, 'running')
+  assert.equal(live.events.some((event) => event.type === 'thinking' && event.text === 'checking repository task state'), true)
+
+  releaseTurn()
+  const completed = await pending
+  assert.equal(completed.thread.status, 'idle')
+  assert.equal(completed.events.filter((event) => event.type === 'thinking').length, 1)
+})
+
 test('main thread task capabilities use repository truth without copying Task Card bodies into Forge state', async () => {
   const { root, stateFile, store } = await fixture()
   const manager = createMainThreadManager({ store, adapters: adapters() })
