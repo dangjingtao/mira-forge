@@ -1,6 +1,6 @@
 # T016 — Builder Thread Adapters for OpenCode, PiAgent and Codex
 
-Status: REVIEW
+Status: PASS
 
 Depends on: T015 PASS.
 
@@ -96,7 +96,7 @@ Repository tests cover:
 - OpenCode regression behavior;
 - cancellation/restart/shutdown supervision inherited from the existing manager.
 
-`npm run check` is the acceptance gate. T016 stays `REVIEW` until the implementation PR passes repository Verify.
+Verify #157 passed on PR #6 with the repository acceptance gate green (`npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`).
 
 ## Narrow Real-machine Smoke
 
@@ -144,4 +144,4 @@ These are observational machine checks, not CI prerequisites. CI exercises both 
 
 ## Handoff
 
-T016 implementation is ready for repository verification. If Verify passes, close T016 as PASS and leave real PiAgent/Codex machine smoke as the narrow observational confirmation path rather than blocking the adapter contract on user-created internal Forge state.
+T016 is PASS. OpenCode, PiAgent and Codex now share the bounded Builder dispatch/supervision contract while preserving provider-specific adapters and global first-use serial safety. The disposable PiAgent/Codex smoke helper remains available for narrow machine-level confirmation without reconstructing Forge internal state.
