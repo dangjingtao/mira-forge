@@ -1,6 +1,6 @@
 # T016 — Builder Thread Adapters for OpenCode, PiAgent and Codex
 
-Status: PASS
+Status: REVIEW
 
 Depends on: T015 PASS.
 
@@ -57,6 +57,7 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - `server/dispatch-manager.mjs`
 - `server/dispatch-domain.mjs`
 - `server/domain.mjs`
+- `src/App.tsx`
 - `scripts/builder-adapter-smoke.mjs`
 - focused adapter/dispatch tests
 
@@ -70,16 +71,6 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - First-use serial safety is preserved globally across the three built-in choices. Adding PiAgent/Codex does not create three simultaneous write lanes into an unmanaged working tree. Parallel Builders remain blocked until a scheduler/worktree contract explicitly replaces this guard.
 - Successful execution still moves the Task only to `reviewing`. Cancellation, restart reconciliation and shutdown remain owned by the existing Forge process-supervision path.
 - `/api/meta` exposes the product-level Builder choices and built-in adapter IDs. Dispatch remains an explicit API/action; creating a main-thread handoff still does not launch a Builder automatically.
-
-## Provider Interface Evidence
-
-### PiAgent
-
-Current Pi coding-agent documentation defines `--mode json` as a JSON-lines event stream and `-p/--print` as non-interactive execution. `--no-session` provides an ephemeral run while the JSON stream still begins with a session header containing an ID. The adapter consumes only the stable session/message/tool lifecycle needed by Forge and does not depend on cumulative token snapshots.
-
-### Codex
-
-T015 already verified the user's installed Codex Desktop bundled backend through its app-server transport. T016 reuses that same discovered executable for construction, but uses its non-interactive `exec` entry point rather than pretending the read-only main-thread app-server contract is a Builder contract. The approval option is emitted as a global Codex option before `exec`, while `workspace-write` remains the bounded construction sandbox.
 
 ## Deterministic Verification
 
@@ -96,21 +87,37 @@ Repository tests cover:
 - OpenCode regression behavior;
 - cancellation/restart/shutdown supervision inherited from the existing manager.
 
-Verify #157 passed on PR #6 with the repository acceptance gate green (`npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`).
+Verify #157 passed on PR #6 with the repository acceptance gate green (`npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`). This proves the adapter/dispatch implementation and deterministic contracts, but it does not prove the human product loop on the user's machine.
 
-## Narrow Real-machine Smoke
+## Human Product-loop Acceptance Gap
 
-Real-provider smoke does not require the user to recreate Forge batches, task IDs, sessions or internal API state. The helper creates a disposable Git repository, asks the selected Builder to write one marker file, verifies it, prints bounded evidence and removes the repository.
+T016 is not accepted yet.
 
-PiAgent:
+The current Web dispatch surface in `src/App.tsx` is still hard-wired to `opencode-local`: it checks only that adapter as the active Builder, posts `adapterId: opencode-local`, labels the action as an OpenCode dispatch, and exposes no PiAgent/Codex Builder selector. Therefore a user cannot exercise the required PiAgent/Codex path through the actual Forge product surface.
+
+The disposable `scripts/builder-adapter-smoke.mjs` helper is useful machine evidence, but it is not a substitute for this acceptance path.
+
+Before T016 may return to PASS, Forge must expose the three Builder choices in the real dispatch surface and a human must complete at least one real PiAgent or Codex dispatch through Forge end-to-end on the user's machine.
+
+Required observed loop:
+
+1. open Forge Web UI against the local control plane;
+2. select a real ready Task Card;
+3. choose `piagent` or `codex` in the dispatch UI;
+4. dispatch from the UI without reconstructing internal IDs or calling the API manually;
+5. observe a real provider process/session identity and live normalized runtime events in Forge;
+6. verify the Builder actually performs the task in the selected project working tree;
+7. verify terminal success moves the Forge Task to `reviewing`, not `review_passed`;
+8. refresh/reopen Forge and confirm durable dispatch/evidence remains visible.
+
+A failure in provider launch, path discovery, event normalization, task execution, state transition, or durable replay fails this human acceptance and keeps T016 in REVIEW.
+
+## Narrow Real-machine Diagnostic
+
+These commands remain useful for isolating provider installation/adapter problems, but do not close T016 by themselves:
 
 ```bash
 node scripts/builder-adapter-smoke.mjs piagent
-```
-
-Codex Desktop bundled backend:
-
-```bash
 node scripts/builder-adapter-smoke.mjs codex
 ```
 
@@ -121,17 +128,16 @@ MIRA_FORGE_PIAGENT_BIN=/path/to/pi node scripts/builder-adapter-smoke.mjs piagen
 MIRA_FORGE_CODEX_DESKTOP_BUILDER_BIN=/path/to/codex node scripts/builder-adapter-smoke.mjs codex
 ```
 
-These are observational machine checks, not CI prerequisites. CI exercises both adapters with deterministic fake runners/protocol fixtures.
-
 ## Acceptance
 
-- The same ready Task Card can be dispatched with an explicit Builder choice of `opencode`, `piagent` or `codex`.
+- The same ready Task Card can be dispatched from the real Forge product surface with an explicit Builder choice of `opencode`, `piagent` or `codex`.
 - Each adapter exposes observed external session/process identity when the provider makes it available.
 - Each adapter produces normalized running/terminal evidence and supports explicit cancellation.
 - Provider-specific malformed output does not crash the control plane.
 - OpenCode regression tests remain green.
 - CI can exercise each adapter through deterministic fake runners or protocol fixtures.
-- At least one narrow real-machine smoke path is documented for PiAgent and Codex without asking the user to recreate internal API state.
+- The PiAgent/Codex real-machine diagnostic path is documented.
+- At least one PiAgent or Codex human product-loop dispatch has actually completed through Forge UI on the user's machine and reached durable Task `reviewing` state.
 - `npm run check` remains green.
 
 ## Out of Scope
@@ -140,8 +146,8 @@ These are observational machine checks, not CI prerequisites. CI exercises both 
 - Main-thread PiAgent support.
 - Automatic Reviewer dispatch.
 - Parallel Builders/worktrees.
-- Provider account/model configuration UI beyond a minimal explicit selector if required.
+- Provider account/model configuration UI beyond the minimal Builder selector needed to exercise this task.
 
 ## Handoff
 
-T016 is PASS. OpenCode, PiAgent and Codex now share the bounded Builder dispatch/supervision contract while preserving provider-specific adapters and global first-use serial safety. The disposable PiAgent/Codex smoke helper remains available for narrow machine-level confirmation without reconstructing Forge internal state.
+T016 remains REVIEW. The provider-neutral Builder contract and deterministic implementation are present, but human product-loop acceptance is blocked by the current OpenCode-only dispatch UI and by the absence of a completed real PiAgent/Codex Forge dispatch on the user's machine.
