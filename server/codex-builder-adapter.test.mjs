@@ -27,7 +27,7 @@ test('Codex Builder args use Desktop backend with workspace-write and no bypass 
     '--json',
     '--sandbox',
     'workspace-write',
-    '-C',
+    '--cd',
     '/tmp/project',
     '--model',
     'gpt-codex',
