@@ -21,7 +21,9 @@ function clampRailWidth(width: number, shellWidth: number) {
 
 function readRailWidth() {
   try {
-    const stored = Number(window.localStorage.getItem(RAIL_WIDTH_KEY))
+    const raw = window.localStorage.getItem(RAIL_WIDTH_KEY)
+    if (raw === null) return DEFAULT_RAIL_WIDTH
+    const stored = Number(raw)
     return Number.isFinite(stored) ? Math.min(Math.max(stored, MIN_RAIL_WIDTH), MAX_RAIL_WIDTH) : DEFAULT_RAIL_WIDTH
   } catch {
     return DEFAULT_RAIL_WIDTH
@@ -30,6 +32,7 @@ function readRailWidth() {
 
 function ForgeShell() {
   const shellRef = useRef<HTMLDivElement>(null)
+  const activePointerRef = useRef<number | null>(null)
   const [railWidth, setRailWidth] = useState(readRailWidth)
   const [resizing, setResizing] = useState(false)
 
@@ -68,19 +71,21 @@ function ForgeShell() {
   function onResizeStart(event: PointerEvent<HTMLDivElement>) {
     if (!window.matchMedia('(min-width: 1181px)').matches) return
     event.preventDefault()
+    activePointerRef.current = event.pointerId
     event.currentTarget.setPointerCapture(event.pointerId)
     setResizing(true)
     resizeTo(event.clientX)
   }
 
   function onResizeMove(event: PointerEvent<HTMLDivElement>) {
-    if (!resizing) return
+    if (activePointerRef.current !== event.pointerId) return
     resizeTo(event.clientX)
   }
 
   function onResizeEnd(event: PointerEvent<HTMLDivElement>) {
-    if (!resizing) return
+    if (activePointerRef.current !== event.pointerId) return
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    activePointerRef.current = null
     setResizing(false)
   }
 
