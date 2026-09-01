@@ -236,6 +236,45 @@ body.forge-resizing-thread * {
   box-shadow: inset 2px 0 0 var(--mira-accent);
 }
 
+/* Runtime bursts must not destroy the control-plane layout. */
+.task-button {
+  min-height: 34px;
+  overflow: hidden;
+}
+
+.task-button > * {
+  min-width: 0;
+}
+
+.event-log {
+  max-height: min(320px, 38vh);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.event-log-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #0e0d0c;
+}
+
+/* Provider adapters can emit many low-level events per second. Keep only the newest pulse in
+   the compact log while preserving lifecycle rows; T018 owns the richer live-runtime surface. */
+.runtime-event.event-provider_event ~ .runtime-event.event-provider_event {
+  display: none;
+}
+
+.runtime-event.event-provider_event strong {
+  font-size: 0;
+}
+
+.runtime-event.event-provider_event strong::after {
+  content: "provider activity";
+  color: var(--cyan);
+  font-size: 9px;
+}
+
 /* Main Thread chrome stays neutral; role and state carry the color. */
 .main-thread-head button {
   min-width: 24px;
@@ -376,5 +415,11 @@ body.forge-resizing-thread * {
   .pane-head {
     min-height: 0;
     padding-top: 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  .event-log {
+    max-height: 220px;
   }
 }
