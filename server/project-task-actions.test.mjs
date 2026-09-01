@@ -40,6 +40,21 @@ async function fixture() {
   return root
 }
 
+async function defaultPathFixture() {
+  const root = await mkdtemp(join(tmpdir(), 'mira-forge-project-default-actions-'))
+  const workbench = join(root, 'docs', 'workbench')
+  const taskDir = join(workbench, 'tasks')
+  await mkdir(taskDir, { recursive: true })
+  await writeFile(join(workbench, '00-work-ledger.md'), [
+    '| ID | Task | Status |',
+    '| --- | --- | --- |',
+    '| T200 | Default task | TODO |',
+    '',
+  ].join('\n'))
+  await writeFile(join(taskDir, 'T200-default-task.md'), '# T200 — Default task\n\nStatus: TODO\n')
+  return root
+}
+
 test('project task actions expose authoritative task refs and create a runtime batch', async (t) => {
   const root = await fixture()
   t.after(() => rm(root, { recursive: true, force: true }))
@@ -106,4 +121,28 @@ test('task-source configuration validates before it is persisted', async (t) => 
   })
   assert.equal(result.project.taskLedger, 'TASKS.md')
   assert.equal(result.source.tasks.length, 2)
+})
+
+test('empty task-source fields use the validated workbench defaults', async (t) => {
+  const root = await defaultPathFixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const store = memoryStore({
+    projects: [{
+      id: 'project-1',
+      name: 'Default Fixture',
+      rootPath: root,
+      repository: null,
+      integrationBranch: 'dev',
+      taskLedger: null,
+      taskDir: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    batches: [],
+  })
+
+  const result = await configureProjectTaskSource(store, 'project-1', { taskLedger: '', taskDir: '' })
+  assert.equal(result.project.taskLedger, 'docs/workbench/00-work-ledger.md')
+  assert.equal(result.project.taskDir, 'docs/workbench/tasks')
+  assert.deepEqual(result.source.tasks.map((task) => task.id), ['T200'])
 })
