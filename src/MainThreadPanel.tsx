@@ -68,6 +68,14 @@ function eventLabel(event: ThreadEvent) {
   return event.text || 'status'
 }
 
+function eventTone(event: ThreadEvent) {
+  if (event.type !== 'status' || !event.text) return ''
+  if (event.text.startsWith('turn.completed')) return 'tone-success'
+  if (event.text.startsWith('turn.failed') || event.text.startsWith('turn.interrupted')) return 'tone-error'
+  if (event.text.includes('running') || event.text.includes('started')) return 'tone-running'
+  return ''
+}
+
 function isTerminalStatus(event: ThreadEvent) {
   return event.type === 'status'
     && Boolean(event.text && (
@@ -116,7 +124,7 @@ function buildTimeline(events: ThreadEvent[]) {
 
 function ThreadEventView({ event }: { event: ThreadEvent }) {
   return (
-    <div className={`main-thread-event event-${event.type} role-${event.role || 'system'}`}>
+    <div className={`main-thread-event event-${event.type} role-${event.role || 'system'} ${eventTone(event)}`}>
       <span>{eventLabel(event)}</span>
       {(event.type === 'message' || event.type === 'thinking') && <p>{event.text}</p>}
       {event.type === 'handoff' && event.handoff && (
@@ -265,7 +273,7 @@ function MainThreadPanel() {
           <span>{snapshot ? `${snapshot.thread.adapter} · ${snapshot.thread.status}` : 'project dispatch conversation'}</span>
         </div>
         <button type="button" onClick={() => setCollapsed((value) => !value)} aria-label={collapsed ? 'Expand main thread' : 'Collapse main thread'}>
-          {collapsed ? '↑' : '↓'}
+          {collapsed ? '+' : '−'}
         </button>
       </header>
 
