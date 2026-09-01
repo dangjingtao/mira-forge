@@ -1,4 +1,117 @@
-/* T017 visual smoke follow-up: keep Mira orange scarce and intentional. */
+/* T017 final workbench pass: Mira identity + technical semantics + IDE-like pane behavior. */
+
+:root {
+  --cyan: #4ec9b0;
+  --blue: #569cd6;
+  --violet: #c586c0;
+  --user-accent: var(--blue);
+  --user-accent-soft: rgba(86, 156, 214, 0.08);
+  --assistant-accent: var(--mira-accent);
+  --assistant-accent-soft: rgba(250, 115, 40, 0.055);
+}
+
+/* Desktop shell: persistent, bounded Main Thread width. */
+.forge-product-shell {
+  grid-template-columns: minmax(0, 1fr) var(--forge-thread-width, 370px);
+}
+
+.forge-product-shell:has(.main-thread-panel.collapsed) {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.forge-thread-rail {
+  position: relative;
+}
+
+/* Extend the control-plane top bar rhythm across the Main Thread rail. */
+.forge-thread-rail::before {
+  content: "";
+  flex: 0 0 34px;
+  border-bottom: 1px solid var(--line);
+  background: #0d0c0b;
+}
+
+.forge-thread-resizer {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.forge-thread-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+}
+
+.forge-thread-resizer:hover::after,
+.forge-thread-resizer:focus-visible::after {
+  background: var(--mira-accent);
+}
+
+.forge-thread-resizer:focus-visible {
+  outline: 1px solid var(--mira-accent);
+  outline-offset: -2px;
+}
+
+.forge-thread-rail:has(.main-thread-panel.collapsed) .forge-thread-resizer {
+  display: none;
+}
+
+body.forge-resizing-thread,
+body.forge-resizing-thread * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* Shared desktop top rhythm: labels begin on one baseline and summary regions end together. */
+.side-title {
+  min-height: 31px;
+  padding: 12px 12px 8px;
+}
+
+.project-item {
+  min-height: 46px;
+}
+
+.pane-head {
+  min-height: 80px;
+  padding: 12px 24px;
+}
+
+.side-title,
+.eyebrow,
+.main-thread-head strong,
+.stream-label,
+.event-log-title {
+  font-family: var(--mono);
+}
+
+.side-title,
+.eyebrow,
+.main-thread-head strong {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: .11em;
+}
+
+.main-thread-head {
+  min-height: 80px;
+  align-items: flex-start;
+  padding: 12px 8px 8px 10px;
+}
 
 /* Structural labels and ordinary controls stay neutral. */
 .side-title span,
@@ -12,20 +125,30 @@
   background: var(--panel2);
 }
 
-.project-item .cursor,
+.project-item .cursor {
+  color: var(--mira-accent);
+}
+
 .new-project,
-.refresh,
-.task b,
-.prompt,
-.event-task,
-.event-started strong,
-.event-session_bound strong {
+.refresh {
   color: var(--text);
 }
 
 .new-project:hover,
 .refresh:hover {
   color: var(--bright);
+}
+
+/* Restore useful VS Code-like technical hues. */
+.task b,
+.event-task,
+.event-started strong,
+.event-session_bound strong {
+  color: var(--cyan);
+}
+
+.prompt {
+  color: var(--mira-accent);
 }
 
 .dot-reviewing {
@@ -58,59 +181,146 @@
   box-shadow: inset 2px 0 0 var(--mira-accent);
 }
 
-/* Main Thread: neutral chrome, accent reserved for focus and rare high-value cues. */
+/* Main Thread chrome stays neutral; role and state carry the color. */
 .main-thread-head button {
+  min-width: 24px;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text);
+  font-size: 14px;
+  line-height: 1;
 }
 
 .main-thread-head button:hover {
-  background: var(--panel2);
-  color: var(--bright);
-}
-
-.main-thread-create button,
-.main-thread-compose button {
   border-color: var(--line-strong);
   background: var(--panel2);
   color: var(--bright);
 }
 
-.main-thread-create button:hover,
-.main-thread-compose button:hover {
+.main-thread-create button {
+  border-color: var(--line-strong);
+  background: var(--panel2);
+  color: var(--bright);
+}
+
+.main-thread-create button:hover {
   border-color: var(--mira-accent);
   color: var(--mira-accent);
 }
 
+.main-thread-compose button {
+  border-color: var(--mira-accent);
+  background: var(--assistant-accent-soft);
+  color: var(--mira-accent);
+}
+
+.main-thread-compose button:hover {
+  border-color: var(--mira-accent-hover);
+  color: #ff8b4a;
+}
+
+/* Human and assistant turns must scan differently before reading the labels. */
 .main-thread-event.role-user {
-  border-left-color: var(--line-strong);
-  background: var(--panel2);
+  margin: 2px 0 4px;
+  padding: 6px 7px;
+  border-left: 2px solid var(--user-accent);
+  border-bottom: 0;
+  border-radius: 0 4px 4px 0;
+  background: var(--user-accent-soft);
 }
 
 .main-thread-event.role-user > span {
-  color: var(--muted);
+  color: var(--user-accent);
+}
+
+.main-thread-event.role-user p {
+  color: var(--bright);
+}
+
+.main-thread-event.role-assistant {
+  margin: 2px 0 4px;
+  padding: 6px 7px;
+  border-left: 2px solid var(--assistant-accent);
+  border-bottom: 0;
+  border-radius: 0 4px 4px 0;
+  background: var(--assistant-accent-soft);
 }
 
 .main-thread-event.role-assistant > span {
-  color: var(--bright);
+  color: var(--assistant-accent);
+}
+
+.main-thread-event.event-tool > span {
+  color: var(--cyan);
 }
 
 .main-thread-event.event-thinking > span,
 .main-thread-process > summary::before {
-  color: var(--muted);
+  color: var(--yellow);
 }
 
-/* Collapse/expand is a state toggle, not a directional movement control. */
-.main-thread-head > button {
-  min-width: 24px;
-  font-size: 0;
+.main-thread-event.event-thinking p {
+  color: #b8afa7;
 }
 
-.main-thread-head > button::before {
-  content: "−";
-  font-size: 14px;
-  line-height: 1;
+.main-thread-event.event-handoff > span,
+.main-thread-event.event-artifact > span {
+  color: var(--violet);
 }
 
-.main-thread-panel.collapsed .main-thread-head > button::before {
-  content: "+";
+.main-thread-event.tone-success > span,
+.main-thread-event.tone-success p {
+  color: var(--green);
+}
+
+.main-thread-event.tone-error > span,
+.main-thread-event.tone-error p {
+  color: var(--red);
+}
+
+.main-thread-event.tone-running > span,
+.main-thread-event.tone-running p {
+  color: var(--yellow);
+}
+
+.main-thread-panel.collapsed .main-thread-head {
+  min-height: 80px;
+  height: 80px;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px 5px;
+}
+
+@media (max-width: 1180px) {
+  .forge-product-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(250px, 36vh);
+  }
+
+  .forge-product-shell:has(.main-thread-panel.collapsed) {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) 36px;
+  }
+
+  .forge-thread-rail::before,
+  .forge-thread-resizer {
+    display: none;
+  }
+
+  .main-thread-head,
+  .main-thread-panel.collapsed .main-thread-head {
+    min-height: 32px;
+    height: auto;
+    align-items: center;
+    padding: 6px 8px 6px 10px;
+  }
+
+  .side-title {
+    padding-top: 10px;
+  }
+
+  .pane-head {
+    min-height: 0;
+    padding-top: 12px;
+  }
 }
