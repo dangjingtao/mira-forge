@@ -138,6 +138,10 @@ The intended result is one coherent engineering workbench rather than three pane
 - Later visual review on 2026-09-01 superseded that acceptance: the restraint pass was judged too color-sparse, human/AI conversation role separation needs stronger visual distinction, Mira orange should remain a visible primary color, and VS Code-like technical colors should be retained where semantically useful.
 - The same visual review identified the fixed Main Thread divider as a false resize affordance; T017 now requires a real bounded desktop drag-resize interaction with local UI preference persistence.
 - Follow-up visual review also identified misaligned top-region rhythm across `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD`; T017 now requires a shared desktop top baseline/spacing rhythm rather than independent pane offsets.
+- Rework pass merged to `dev` through PR `#14` at squash commit `71db8a3b4e8f397dbb327209eee12a907574fcdd`.
+- PR `#14` implements blue/cyan/yellow/violet technical role/state cues, distinct blue human vs orange assistant turns, real bounded/persistent Main Thread drag resizing with keyboard support, and the shared desktop top rhythm.
+- PR `#14` Verify run `33500817912` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` on final head `ed8978b7b4efd3c8b03089b850522d1c0bf40562`.
+- T017 remains `REVIEW` until the merged rework is visually smoked in the browser.
 
 ## Out of Scope
 
@@ -157,4 +161,4 @@ Resolved: the three desktop top regions should align as one coherent workbench w
 
 ## Handoff
 
-T017 is reopened to `REVIEW` for one focused visual/interaction pass. Keep the compact layout and `− / +` control; restore stronger human/AI role distinction and useful VS Code-like semantic colors, implement bounded persistent desktop Main Thread rail resizing, and align the left workspace summary, central project header and Main Thread header to one coherent top rhythm. Re-run automated checks and one short browser smoke before PASS.
+T017 rework is merged to `dev` and automated verification is green. Repeat the short browser smoke for color balance, human/assistant distinction, rail resizing/persistence and top-region alignment. Keep the task in `REVIEW` until that human visual acceptance is complete.
