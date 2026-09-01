@@ -21,7 +21,7 @@ function projectForId(state, projectId) {
   return project
 }
 
-function withTaskSourceDefaults(project) {
+export function withTaskSourceDefaults(project) {
   return {
     ...project,
     taskLedger: optionalString(project?.taskLedger) || DEFAULT_TASK_LEDGER,

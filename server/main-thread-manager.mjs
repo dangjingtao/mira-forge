@@ -16,6 +16,7 @@ import {
   resolveRepositoryTask,
   updateRepositoryTask,
 } from './repo-task-source.mjs'
+import { withTaskSourceDefaults } from './project-task-actions.mjs'
 
 function requiredString(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`)
@@ -102,13 +103,14 @@ export function createMainThreadManager({ store, adapters }) {
       const state = await store.read()
       const thread = findMainThread(state, startedThread.id)
       const project = projectForThread(state, thread)
+      const taskProject = withTaskSourceDefaults(project)
       const adapter = adapters.get(thread.adapter)
       if (!adapter?.runTurn) throw new Error(`main thread adapter is unavailable: ${thread.adapter}`)
 
       let taskSource = null
       let taskSourceError = null
       try {
-        taskSource = await inspectRepositoryTaskSource(project)
+        taskSource = await inspectRepositoryTaskSource(taskProject)
       } catch (error) {
         taskSourceError = error instanceof Error ? error.message : String(error)
       }
@@ -140,7 +142,7 @@ export function createMainThreadManager({ store, adapters }) {
   async function inspectTasks(threadId) {
     const state = await store.read()
     const thread = findMainThread(state, threadId)
-    const project = projectForThread(state, thread)
+    const project = withTaskSourceDefaults(projectForThread(state, thread))
     const source = await inspectRepositoryTaskSource(project)
     await store.mutate((nextState) => {
       appendMainThreadEvent(nextState, thread.id, {
@@ -155,7 +157,7 @@ export function createMainThreadManager({ store, adapters }) {
   async function resolveTask(threadId, taskId) {
     const state = await store.read()
     const thread = findMainThread(state, threadId)
-    const project = projectForThread(state, thread)
+    const project = withTaskSourceDefaults(projectForThread(state, thread))
     const task = await resolveRepositoryTask(project, taskId)
     await store.mutate((nextState) => {
       appendMainThreadEvent(nextState, thread.id, {
@@ -170,7 +172,7 @@ export function createMainThreadManager({ store, adapters }) {
   async function createTask(threadId, input) {
     const state = await store.read()
     const thread = findMainThread(state, threadId)
-    const project = projectForThread(state, thread)
+    const project = withTaskSourceDefaults(projectForThread(state, thread))
     const task = await createRepositoryTask(project, input)
     await store.mutate((nextState) => {
       appendMainThreadEvent(nextState, thread.id, {
@@ -190,7 +192,7 @@ export function createMainThreadManager({ store, adapters }) {
   async function updateTask(threadId, taskId, patch) {
     const state = await store.read()
     const thread = findMainThread(state, threadId)
-    const project = projectForThread(state, thread)
+    const project = withTaskSourceDefaults(projectForThread(state, thread))
     const task = await updateRepositoryTask(project, taskId, patch)
     await store.mutate((nextState) => {
       appendMainThreadEvent(nextState, thread.id, {
@@ -210,7 +212,7 @@ export function createMainThreadManager({ store, adapters }) {
   async function createHandoff(threadId, input) {
     const state = await store.read()
     const thread = findMainThread(state, threadId)
-    const project = projectForThread(state, thread)
+    const project = withTaskSourceDefaults(projectForThread(state, thread))
     const taskId = requiredString(input?.taskId, 'taskId')
     const preferredBuilder = requiredString(input?.preferredBuilder, 'preferredBuilder')
     const task = await resolveRepositoryTask(project, taskId)

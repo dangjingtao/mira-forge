@@ -70,6 +70,40 @@ function adapters() {
   ])
 }
 
+async function conventionalFixture() {
+  const root = await mkdtemp(join(tmpdir(), 'mira-forge-main-thread-default-source-'))
+  const taskDir = join(root, 'docs', 'workbench', 'tasks')
+  await mkdir(taskDir, { recursive: true })
+  await writeFile(join(root, 'docs', 'workbench', '00-work-ledger.md'), [
+    '# Work Ledger',
+    '',
+    '| ID | Task | Status | Evidence |',
+    '| --- | --- | --- | --- |',
+    '| T001 | Conventional task | REVIEW | fixture |',
+    '',
+  ].join('\n'), 'utf8')
+  await writeFile(join(taskDir, 'T001-conventional-task.md'), [
+    '# T001 — Conventional task',
+    '',
+    'Status: REVIEW',
+    '',
+  ].join('\n'), 'utf8')
+
+  const store = createStore(join(root, 'state.json'))
+  await store.mutate((state) => {
+    state.projects.push({
+      id: 'p1',
+      name: 'Conventional Project',
+      rootPath: root,
+      repository: null,
+      taskLedger: null,
+      taskDir: null,
+      integrationBranch: 'dev',
+    })
+  })
+  return { root, store }
+}
+
 test('registered projects can keep durable main threads for OpenCode and Codex', async () => {
   for (const adapter of ['opencode', 'codex']) {
     const { stateFile, store } = await fixture()
@@ -91,6 +125,42 @@ test('registered projects can keep durable main threads for OpenCode and Codex',
     const second = await restarted.sendMessage(thread.id, { message: 'Continue from that context.' })
     assert.equal(second.thread.externalThreadId, `${adapter}-thread-1`)
   }
+})
+
+test('main thread and Batch paths share conventional repository task-source defaults', async () => {
+  const { store } = await conventionalFixture()
+  let prompt = ''
+  const adapter = {
+    id: 'opencode',
+    async runTurn(input) {
+      prompt = input.message
+      return {
+        externalThreadId: 'default-source-thread',
+        responseText: 'done',
+        events: [],
+        providerEventType: 'opencode.turn.completed',
+      }
+    },
+  }
+  const manager = createMainThreadManager({ store, adapters: new Map([['opencode', adapter]]) })
+  const thread = await manager.openThread({ projectId: 'p1', adapter: 'opencode' })
+
+  await manager.sendMessage(thread.id, { message: 'inspect project tasks' })
+  assert.match(prompt, /Ledger: docs\/workbench\/00-work-ledger\.md/)
+  assert.match(prompt, /Task dir: docs\/workbench\/tasks/)
+  assert.match(prompt, /T001 \[REVIEW\] Conventional task/)
+
+  const source = await manager.inspectTasks(thread.id)
+  assert.equal(source.tasks.length, 1)
+  const resolved = await manager.resolveTask(thread.id, 'T001')
+  assert.equal(resolved.taskRef, 'docs/workbench/tasks/T001-conventional-task.md')
+
+  const created = await manager.createTask(thread.id, { id: 'T002', title: 'Created by main thread', status: 'TODO' })
+  assert.equal(created.taskRef, 'docs/workbench/tasks/T002-created-by-main-thread.md')
+  const updated = await manager.updateTask(thread.id, 'T002', { status: 'REVIEW' })
+  assert.equal(updated.status, 'REVIEW')
+  const handoff = await manager.createHandoff(thread.id, { taskId: 'T001', preferredBuilder: 'opencode' })
+  assert.equal(handoff.handoff.taskRef, 'docs/workbench/tasks/T001-conventional-task.md')
 })
 
 test('provider progress is durable while a main-thread turn is still running', async () => {
@@ -204,5 +274,5 @@ test('main thread can chat even when repository task source is not configured', 
   const thread = await manager.openThread({ projectId: 'p1', adapter: 'opencode' })
   const snapshot = await manager.sendMessage(thread.id, { message: 'hello' })
   assert.equal(snapshot.events.some((event) => event.text === 'opencode reply'), true)
-  await assert.rejects(() => manager.inspectTasks(thread.id), /project.taskLedger is required/)
+  await assert.rejects(() => manager.inspectTasks(thread.id), /task ledger is unavailable/)
 })

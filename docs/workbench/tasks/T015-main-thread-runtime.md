@@ -82,6 +82,7 @@ The normalized event contract currently includes `message / thinking / tool / st
 - All Codex resume paths require the provider to report the exact requested thread ID.
 - Provider-normalized thinking/tool events are persisted while a turn is still running; the Web surface polls faster during an active turn so execution progress becomes visible before the final response.
 - `server/main-thread-manager.mjs` injects bounded registered-project/task-index context, reuses the T014 task-source module for inspect/resolve/create/update, and creates reference-only dispatch handoffs without launching a Builder.
+- Main-thread task inspection, resolution, creation, update and handoff all pass through the same conventional task-source defaults as Batch. A project with null task-source fields therefore resolves to `docs/workbench/00-work-ledger.md` and `docs/workbench/tasks` consistently instead of making the main thread report an unavailable ledger while Batch reads one.
 - Schema-1 state adds `threads` and `threadEvents` as backward-compatible additive collections. A control-plane restart reconciles an in-flight main-thread turn to an explicit interrupted/error state.
 - `server/index.mjs` exposes thread/message/task/handoff endpoints without changing the existing dispatch authority and registers OpenCode, Codex Desktop and Codex CLI main-thread adapters.
 - `src/MainThreadPanel.tsx` exposes separate `OpenCode`, `Codex Desktop`, and `Codex CLI` choices. It uses a controlled composer, clears on send, restores the draft on request failure, supports `Ctrl+Enter`, and folds thinking/execution details after turn completion. The larger visual redesign remains T017.
@@ -94,6 +95,7 @@ The normalized event contract currently includes `message / thinking / tool / st
 - Codex Desktop sandbox-mode fix Verify #139 passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` against head `1bf3ffc03ef31d065660baf437c2c749eeecd4c3`.
 - Repository tests cover live provider-progress persistence while a turn remains `running`, OpenCode/Codex reasoning normalization, bounded progress streaming without duplicate final events, fake-provider thread contracts, durable replay after reopening the state store, a real temporary Markdown Task Card create/read/update cycle through T014, absence of Task Card body content from Forge state, and no auto-dispatch on handoff.
 - Codex Desktop tests cover current/legacy macOS bundle discovery, explicit binary override behavior, the distinct thread-level `read-only` and turn-level `readOnly` sandbox contracts, reasoning/tool normalization, initialize handshake, new thread creation, exact-ID resume and final response capture without a real provider in CI.
+- The 2026-09-01 T015 regression run passed all 90 repository tests, `npm run typecheck`, and `npm run build`. Focused coverage proves that main-thread prompt injection and task inspect/resolve/create/update/handoff share the same default-resolved source paths.
 
 ## Smoke Findings — 2026-08-31
 
@@ -108,17 +110,19 @@ The first real Web smoke found and closed several product/runtime issues:
 
 ### OpenCode real-provider evidence
 
-OpenCode machine smoke is accepted:
+The 2026-08-31 OpenCode machine smoke remains valid for provider transport, durable continuation and UI replay:
 
-- first turn inspected the real project ledger and identified `T012 — TUI dispatch wiring`;
+- the first turn inspected the repository bound to the project at that time and identified `T012 — TUI dispatch wiring`;
 - the Forge Web UI was refreshed between turns;
 - normalized history replayed after refresh;
 - the second turn correctly continued the same context and returned the prior task ID/title;
 - the thinking/execution section rendered and collapsed after completion.
 
+It is not valid evidence that the selected `mira-mobile` project consumed its real Mobile ledger. The local project record incorrectly pointed at the Forge checkout, so `T012` came from Forge's own workbench rather than Mobile repository truth.
+
 ### Codex Desktop real-provider evidence
 
-Codex Desktop machine smoke is accepted:
+The 2026-08-31 Codex Desktop machine smoke likewise remains valid for the Desktop adapter protocol and continuation contract, but its `T012` result is not accepted as selected-project task-source evidence:
 
 - the installed desktop-bundled backend successfully initialized through the app-server path;
 - the first turn inspected the real project and identified `T012 — TUI dispatch wiring`;
@@ -126,13 +130,38 @@ Codex Desktop machine smoke is accepted:
 - normalized process events rendered during the turn;
 - the earlier sandbox enum mismatch was fixed and did not recur in the accepted run.
 
-The user explicitly accepted T015 after this real-provider smoke. UI polish or visual/interaction issues discovered around the main-thread surface are not part of this acceptance closure and are deferred to T017 or later UI work.
+The user explicitly accepted T015 after this real-provider smoke. UI polish or visual/interaction issues discovered around the main-thread surface are not part of this acceptance closure and are deferred to T017 or later UI work. The wrong-root finding on 2026-09-01 reopened the task-source portion of T015 for regression repair and revalidation.
+
+## Task-Source Regression and Revalidation — 2026-09-01
+
+The selected `mira-mobile` project was registered with the right name and repository URL but the wrong local root:
+
+- wrong root: `/Users/tao/Desktop/workspace/mira-forge`;
+- correct active checkout: `/Users/tao/Developer/uichat-mira-mobile`;
+- real ledger: `docs/workbench/00-work-ledger.md` with 34 entries from `MOB-001` through `MOB-034`;
+- real Task Card directory: `docs/task-cards`.
+
+The project record also had null `taskLedger` and `taskDir` fields. Batch applied conventional defaults, while the main-thread manager called repository task APIs without applying those defaults. This produced inconsistent behavior: Batch could read Forge's own default ledger from the wrong root, while main-thread prompt injection could report the task source as unavailable.
+
+The repair:
+
+1. exports and reuses `withTaskSourceDefaults` for every main-thread task-source operation;
+2. adds a regression fixture proving prompt injection, inspect, resolve, create, update and handoff use identical default paths;
+3. corrects the durable local `mira-mobile` project binding while preserving its project ID, five prior threads and thread-event history;
+4. sets the explicit Mobile task source to `docs/workbench/00-work-ledger.md` and `docs/task-cards`.
+
+Revalidation evidence:
+
+- live project and existing-main-thread task APIs both returned exactly 34 Mobile tasks, first `MOB-001` and last `MOB-034`;
+- a controlled prompt-capture check used project root `/Users/tao/Developer/uichat-mira-mobile`, injected both configured task-source paths and the `MOB-*` index, and contained no Forge `T012` entry;
+- a new real OpenCode main thread `MT-bdfcb6a6-0dd` answered from injected context that the project is `mira-mobile`, the task count is 34, and the first/last IDs are `MOB-001` and `MOB-034`, without modifying files.
+- `MOB-001` through `MOB-006` currently have no matching files under `docs/task-cards`; ledger inspection is accepted for this regression, while resolving those cards must continue to fail explicitly rather than inventing content.
 
 ## Acceptance Closure
 
-T015 is `PASS` as of 2026-08-31.
+T015 is `PASS` after task-source revalidation on 2026-09-01.
 
-The provider/runtime contract is accepted on the evidence above. OpenCode refresh replay was exercised directly. Codex Desktop exact-thread continuation is covered by repository tests and a real two-turn machine smoke; acceptance does not require additional UI-polish work. Codex CLI remains an optional distinct adapter and is not required for T015 closure.
+The provider/runtime contract remains accepted on the earlier transport evidence. The invalid wrong-root task-source evidence was explicitly discarded, the shared default-path defect was repaired, the durable project binding was corrected, and a new real OpenCode thread consumed the actual Mobile task index. Codex Desktop exact-thread continuation remains covered by repository tests and the earlier real two-turn machine smoke; acceptance does not require additional UI-polish work. Codex CLI remains an optional distinct adapter and is not required for T015 closure.
 
 ## Out of Scope
 
