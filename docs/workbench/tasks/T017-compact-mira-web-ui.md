@@ -56,6 +56,18 @@ The first pass used too much orange; the subsequent restraint pass then over-cor
 
 The intended result is a compact engineering workbench with a visible Mira orange identity, clear human/AI role separation, and enough VS Code-like semantic color to scan technical state quickly.
 
+## Main Thread Rail Interaction
+
+Visual smoke also exposed a strong false affordance: the fixed vertical divider beside the Main Thread rail looks draggable, but the rail currently has no resize behavior. Because conversation width is a real working preference rather than decoration, implement actual horizontal resizing instead of merely trying to make the divider look less draggable.
+
+- The divider between the control surface and Main Thread rail acts as a resize handle on desktop layouts where the rail is on the right.
+- Dragging changes the Main Thread rail width continuously without breaking text selection, keyboard focus or active thread state.
+- Use sensible minimum and maximum widths so neither the control surface nor conversation pane can be collapsed accidentally into an unusable state.
+- Preserve the explicit `− / +` collapse control; resizing and collapsing are separate actions.
+- Persist the user's chosen rail width locally across refresh/restart where practical; this is UI preference state, not runtime/task truth.
+- At narrow layouts where Main Thread moves below the main surface, horizontal resize behavior is disabled rather than repurposed into a confusing vertical drag interaction.
+- The resize handle should provide an appropriate resize cursor and visible hover/focus affordance without becoming a large decorative gutter.
+
 ## Hard Constraints
 
 - Do not remove keyboard-first interaction merely to simplify styling.
@@ -65,6 +77,7 @@ The intended result is a compact engineering workbench with a visible Mira orang
 - Do not change task/runtime contracts owned by T014-T016.
 - Do not introduce mixed Chinese/English product copy; visible UI is English-only.
 - Do not remove the Mira primary color entirely or collapse technical semantic colors into one accent.
+- Do not implement rail resizing through runtime/project persistence APIs; keep it as local UI preference state.
 
 ## Execution Entry Points
 
@@ -84,6 +97,10 @@ The intended result is a compact engineering workbench with a visible Mira orang
 - Useful technical/semantic color variation remains available: informational/tool, thinking/running/warning, success and error states are not all reduced to orange/gray.
 - Most structural UI stays neutral enough that role/state colors remain meaningful.
 - Main Thread collapse/expand control uses `− / +` with unambiguous behavior.
+- On desktop, the Main Thread rail can be resized horizontally by dragging its divider; the cursor/handle clearly signals this capability.
+- Rail resizing has sensible bounds, keeps the rest of the workspace usable, and does not reset selection, focus, draft text or active thread state.
+- A chosen desktop rail width is restored after refresh where local UI persistence is available.
+- Narrow layouts do not expose a misleading horizontal resize affordance after the Main Thread rail moves below the main surface.
 - Major page regions are visibly denser than the original implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
 - Main thread, project/task/thread navigation and runtime information can coexist on a normal laptop viewport without unnecessary scrolling caused by decorative spacing.
 - All visible product UI text is English.
@@ -105,6 +122,7 @@ The intended result is a compact engineering workbench with a visible Mira orang
 - PR `#8` Verify run `33382968808` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
 - Human browser visual smoke initially accepted the restrained accent pass on 2026-08-31.
 - Later visual review on 2026-09-01 superseded that acceptance: the restraint pass was judged too color-sparse, human/AI conversation role separation needs stronger visual distinction, Mira orange should remain a visible primary color, and VS Code-like technical colors should be retained where semantically useful.
+- The same visual review identified the fixed Main Thread divider as a false resize affordance; T017 now requires a real bounded desktop drag-resize interaction with local UI preference persistence.
 
 ## Out of Scope
 
@@ -118,6 +136,8 @@ The intended result is a compact engineering workbench with a visible Mira orang
 
 Resolved: Mira orange remains the primary brand color, but it coexists with neutral structural chrome and semantic technical colors rather than replacing them.
 
+Resolved: the right Main Thread divider should become a real desktop resize handle rather than being visually disguised as non-interactive chrome.
+
 ## Handoff
 
-T017 is reopened to `REVIEW` for one focused color-balance pass. Keep the compact layout and `− / +` control; restore stronger human/AI role distinction and useful VS Code-like semantic colors without returning to the original all-orange treatment. Re-run automated checks and one short browser smoke before PASS.
+T017 is reopened to `REVIEW` for one focused visual/interaction pass. Keep the compact layout and `− / +` control; restore stronger human/AI role distinction and useful VS Code-like semantic colors, then implement bounded persistent desktop Main Thread rail resizing. Re-run automated checks and one short browser smoke before PASS.
