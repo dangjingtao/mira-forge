@@ -1,6 +1,6 @@
 # T017 — Compact Mira Web UI
 
-Status: PASS
+Status: REVIEW
 
 Depends on: T015 PASS.
 
@@ -41,19 +41,20 @@ The target is not a large "professional-looking" dashboard. The interface should
 
 Use the repository/current Mira visual source if a canonical primary color is already available at implementation time. Do not guess a new brand color when a real token/source can be read.
 
-## Visual Smoke Follow-up
+## Visual Direction Correction
 
-Human visual smoke found that the compact direction is broadly correct, but the first pass uses the Mira orange too frequently. Refine the surface with Claude Code-style restraint as a reference principle, not as a pixel-for-pixel copy.
+The first pass used too much orange; the subsequent restraint pass then over-corrected and removed too much useful color. The target is a balanced Claude Code / VS Code-inspired engineering palette, not a monochrome neutral UI.
 
-- Treat Mira orange as a scarce accent, not the default structural color.
-- Keep `#FA7328` for selected/current focus, keyboard focus, a small number of primary/active actions, and occasional high-value emphasis.
-- Return ordinary borders, separators, passive icons, secondary buttons, inactive labels and most panel chrome to neutral gray/brown-black tokens.
-- Keep semantic states semantic: success green, warning/attention yellow, destructive/error red; do not make every state orange.
-- Prefer hierarchy from typography, spacing, alignment and surface contrast before adding accent color.
-- Avoid combinations of orange text + orange border + orange background on the same ordinary control.
-- Main Thread collapse control should use `−` when expanded and `+` when collapsed. Do not use directional arrows for this action because they read as movement/scroll controls.
+- Mira orange `#FA7328` remains the product's clear primary brand color. It may appear in assistant identity, selected/current focus, keyboard focus, primary actions and a limited number of high-value active states.
+- Human and AI conversation turns must be visually distinguishable at a glance without relying only on `USER` / `ASSISTANT` labels. Do not render both roles with the same orange treatment.
+- Keep ordinary structural chrome — separators, passive borders, inactive controls and large panel surfaces — mostly neutral so the accent keeps meaning.
+- Restore useful VS Code-like technical color variation instead of aliasing every accent-like role to orange. Blue/cyan may represent informational/tool activity; yellow may represent thinking/running/warning; green success; red failure/destructive states; other technical hues may remain where they improve scanning.
+- In particular, `--cyan` should be a real independent technical color rather than an alias of `--mira-accent` if the UI uses it for tool/information semantics.
+- Orange should feel like the primary identity color, not the only color in the product.
+- Prefer role/state semantics over decorative color. Avoid orange text + orange border + orange background on ordinary controls.
+- Main Thread collapse control uses `−` when expanded and `+` when collapsed.
 
-The intended result is a mostly neutral engineering workbench with Mira orange used as a precise identity/focus signal.
+The intended result is a compact engineering workbench with a visible Mira orange identity, clear human/AI role separation, and enough VS Code-like semantic color to scan technical state quickly.
 
 ## Hard Constraints
 
@@ -63,7 +64,7 @@ The intended result is a mostly neutral engineering workbench with Mira orange u
 - Do not add gratuitous animation.
 - Do not change task/runtime contracts owned by T014-T016.
 - Do not introduce mixed Chinese/English product copy; visible UI is English-only.
-- Do not remove the Mira primary color entirely; reduce its coverage and improve its role.
+- Do not remove the Mira primary color entirely or collapse technical semantic colors into one accent.
 
 ## Execution Entry Points
 
@@ -78,10 +79,12 @@ The intended result is a mostly neutral engineering workbench with Mira orange u
 
 ## Acceptance
 
-- Mira primary accent is consistently used for selection, active/focus and important status emphasis without overwhelming the screen.
-- Most structural UI is neutral; orange is visibly sparse and intentional rather than repeated across borders, labels and controls.
+- Mira orange is visibly the primary product accent without overwhelming structural chrome.
+- Human and AI turns are immediately distinguishable by role styling even before reading the role label.
+- Useful technical/semantic color variation remains available: informational/tool, thinking/running/warning, success and error states are not all reduced to orange/gray.
+- Most structural UI stays neutral enough that role/state colors remain meaningful.
 - Main Thread collapse/expand control uses `− / +` with unambiguous behavior.
-- Major page regions are visibly denser than the current implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
+- Major page regions are visibly denser than the original implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
 - Main thread, project/task/thread navigation and runtime information can coexist on a normal laptop viewport without unnecessary scrolling caused by decorative spacing.
 - All visible product UI text is English.
 - Keyboard navigation/focus remains usable and visible.
@@ -97,10 +100,11 @@ The intended result is a mostly neutral engineering workbench with Mira orange u
 - Existing project/task keyboard interactions, thread actions, dispatch/cancel contracts and provider/runtime APIs were not changed.
 - The current `dev` choice to leave the First-run Check launcher entry unmounted is preserved; its dormant UI remains styled and the remaining Chinese diagnostic label was replaced with English.
 - GitHub Actions Verify run `33363325558` passed on the final PR head. The job passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
-- Human visual smoke on 2026-08-31 identified two follow-ups before PASS: orange usage is too broad, and Main Thread collapse/expand arrows should become `− / +`.
+- Human visual smoke on 2026-08-31 identified two first-pass follow-ups: orange usage was too broad, and Main Thread collapse/expand arrows should become `− / +`.
 - Visual restraint follow-up merged to `dev` through PR `#8` at squash commit `c97bfdf597cb7fdc5eb94a85a3829285a0690548`.
 - PR `#8` Verify run `33382968808` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
-- Human browser visual smoke accepted the restrained accent pass and `− / +` collapse control on 2026-08-31.
+- Human browser visual smoke initially accepted the restrained accent pass on 2026-08-31.
+- Later visual review on 2026-09-01 superseded that acceptance: the restraint pass was judged too color-sparse, human/AI conversation role separation needs stronger visual distinction, Mira orange should remain a visible primary color, and VS Code-like technical colors should be retained where semantically useful.
 
 ## Out of Scope
 
@@ -112,8 +116,8 @@ The intended result is a mostly neutral engineering workbench with Mira orange u
 
 ## Unknown / Human Decision
 
-Resolved for T017: the canonical Mira primary was read from the current Mira visual source and applied as `#FA7328`; no new brand hue was invented.
+Resolved: Mira orange remains the primary brand color, but it coexists with neutral structural chrome and semantic technical colors rather than replacing them.
 
 ## Handoff
 
-T017 PASS. The compact restrained visual system is accepted and T018 is unblocked.
+T017 is reopened to `REVIEW` for one focused color-balance pass. Keep the compact layout and `− / +` control; restore stronger human/AI role distinction and useful VS Code-like semantic colors without returning to the original all-orange treatment. Re-run automated checks and one short browser smoke before PASS.
