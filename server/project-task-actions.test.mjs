@@ -55,21 +55,26 @@ async function defaultPathFixture() {
   return root
 }
 
+function project(root, overrides = {}) {
+  return {
+    id: 'project-1',
+    name: 'Fixture',
+    rootPath: root,
+    repository: null,
+    integrationBranch: 'dev',
+    taskLedger: null,
+    taskDir: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
 test('project task actions expose authoritative task refs and create a runtime batch', async (t) => {
   const root = await fixture()
   t.after(() => rm(root, { recursive: true, force: true }))
   const store = memoryStore({
-    projects: [{
-      id: 'project-1',
-      name: 'Fixture',
-      rootPath: root,
-      repository: null,
-      integrationBranch: 'dev',
-      taskLedger: 'TASKS.md',
-      taskDir: 'docs/tasks',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }],
+    projects: [project(root, { taskLedger: 'TASKS.md', taskDir: 'docs/tasks' })],
     batches: [],
   })
 
@@ -94,20 +99,7 @@ test('project task actions expose authoritative task refs and create a runtime b
 test('task-source configuration validates before it is persisted', async (t) => {
   const root = await fixture()
   t.after(() => rm(root, { recursive: true, force: true }))
-  const store = memoryStore({
-    projects: [{
-      id: 'project-1',
-      name: 'Fixture',
-      rootPath: root,
-      repository: null,
-      integrationBranch: 'dev',
-      taskLedger: null,
-      taskDir: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }],
-    batches: [],
-  })
+  const store = memoryStore({ projects: [project(root)], batches: [] })
 
   await assert.rejects(
     configureProjectTaskSource(store, 'project-1', { taskLedger: 'missing.md', taskDir: 'docs/tasks' }),
@@ -126,23 +118,31 @@ test('task-source configuration validates before it is persisted', async (t) => 
 test('empty task-source fields use the validated workbench defaults', async (t) => {
   const root = await defaultPathFixture()
   t.after(() => rm(root, { recursive: true, force: true }))
-  const store = memoryStore({
-    projects: [{
-      id: 'project-1',
-      name: 'Default Fixture',
-      rootPath: root,
-      repository: null,
-      integrationBranch: 'dev',
-      taskLedger: null,
-      taskDir: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }],
-    batches: [],
-  })
+  const store = memoryStore({ projects: [project(root)], batches: [] })
 
   const result = await configureProjectTaskSource(store, 'project-1', { taskLedger: '', taskDir: '' })
   assert.equal(result.project.taskLedger, 'docs/workbench/00-work-ledger.md')
   assert.equal(result.project.taskDir, 'docs/workbench/tasks')
   assert.deepEqual(result.source.tasks.map((task) => task.id), ['T200'])
+})
+
+test('unconfigured projects automatically use standard workbench task paths', async (t) => {
+  const root = await defaultPathFixture()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const store = memoryStore({ projects: [project(root)], batches: [] })
+
+  const source = await inspectProjectTaskSource(store, 'project-1')
+  assert.equal(source.ledgerRef, 'docs/workbench/00-work-ledger.md')
+  assert.equal(source.taskDirRef, 'docs/workbench/tasks')
+  assert.deepEqual(source.tasks.map((task) => task.id), ['T200'])
+
+  const resolved = await resolveProjectTask(store, 'project-1', 'T200')
+  assert.equal(resolved.taskRef, 'docs/workbench/tasks/T200-default-task.md')
+
+  const batch = await createProjectBatch(store, 'project-1', { taskIds: ['T200'] })
+  assert.equal(batch.tasks[0].id, 'T200')
+
+  // Defaults are inferred for execution, not silently persisted as project configuration.
+  assert.equal(store.state.projects[0].taskLedger, null)
+  assert.equal(store.state.projects[0].taskDir, null)
 })

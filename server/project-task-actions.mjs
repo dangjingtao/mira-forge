@@ -21,6 +21,14 @@ function projectForId(state, projectId) {
   return project
 }
 
+function withTaskSourceDefaults(project) {
+  return {
+    ...project,
+    taskLedger: optionalString(project?.taskLedger) || DEFAULT_TASK_LEDGER,
+    taskDir: optionalString(project?.taskDir) || DEFAULT_TASK_DIR,
+  }
+}
+
 function taskIdList(value) {
   if (!Array.isArray(value) || value.length === 0) throw new Error('taskIds must not be empty')
   const ids = value.map((item) => requiredString(item, 'taskId'))
@@ -30,12 +38,15 @@ function taskIdList(value) {
 
 export async function inspectProjectTaskSource(store, projectId) {
   const state = await store.read()
-  return inspectRepositoryTaskSource(projectForId(state, projectId))
+  return inspectRepositoryTaskSource(withTaskSourceDefaults(projectForId(state, projectId)))
 }
 
 export async function resolveProjectTask(store, projectId, taskId) {
   const state = await store.read()
-  return resolveRepositoryTask(projectForId(state, projectId), requiredString(taskId, 'taskId'))
+  return resolveRepositoryTask(
+    withTaskSourceDefaults(projectForId(state, projectId)),
+    requiredString(taskId, 'taskId'),
+  )
 }
 
 export async function configureProjectTaskSource(store, projectId, input) {
@@ -61,7 +72,7 @@ export async function configureProjectTaskSource(store, projectId, input) {
 export async function createProjectBatch(store, projectId, input) {
   const ids = taskIdList(input?.taskIds)
   const snapshot = await store.read()
-  const project = projectForId(snapshot, projectId)
+  const project = withTaskSourceDefaults(projectForId(snapshot, projectId))
   const source = await inspectRepositoryTaskSource(project)
   const byId = new Map(source.tasks.map((task) => [task.id, task]))
 
