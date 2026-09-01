@@ -209,6 +209,8 @@ function MainThreadPanel() {
 
   const visibleEvents = useMemo(() => snapshot?.events.slice(-100) ?? [], [snapshot?.events])
   const timeline = useMemo(() => buildTimeline(visibleEvents), [visibleEvents])
+  const threadAdapter = snapshot?.thread.adapter ?? adapter
+  const threadStatus = snapshot?.thread.status ?? (threadId ? 'loading' : 'ready')
 
   async function createThread(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -268,9 +270,12 @@ function MainThreadPanel() {
   return (
     <section className={`main-thread-panel ${collapsed ? 'collapsed' : ''}`} aria-label="main thread">
       <header className="main-thread-head">
-        <div>
+        <div className="main-thread-headline">
           <strong>MAIN THREAD</strong>
-          <span>{snapshot ? `${snapshot.thread.adapter} · ${snapshot.thread.status}` : 'project dispatch conversation'}</span>
+          <span className="main-thread-head-separator" aria-hidden="true">·</span>
+          <span className="main-thread-adapter">{threadAdapter}</span>
+          <span className="main-thread-head-separator" aria-hidden="true">·</span>
+          <span className={`main-thread-status status-${threadStatus}`}>{threadStatus}</span>
         </div>
         <button type="button" onClick={() => setCollapsed((value) => !value)} aria-label={collapsed ? 'Expand main thread' : 'Collapse main thread'}>
           {collapsed ? '+' : '−'}
