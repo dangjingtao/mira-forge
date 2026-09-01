@@ -23,14 +23,6 @@
   position: relative;
 }
 
-/* Extend the control-plane top bar rhythm across the Main Thread rail. */
-.forge-thread-rail::before {
-  content: "";
-  flex: 0 0 34px;
-  border-bottom: 1px solid var(--line);
-  background: #0d0c0b;
-}
-
 .forge-thread-resizer {
   position: absolute;
   z-index: 8;
@@ -75,7 +67,7 @@ body.forge-resizing-thread * {
   user-select: none !important;
 }
 
-/* Shared desktop top rhythm: labels begin on one baseline and summary regions end together. */
+/* Shared section rhythm below the unified top bar. */
 .side-title {
   min-height: 31px;
   padding: 12px 12px 8px;
@@ -107,10 +99,73 @@ body.forge-resizing-thread * {
   letter-spacing: .11em;
 }
 
+/* Main Thread now occupies the same 34px top-bar row as the control plane. */
 .main-thread-head {
-  min-height: 80px;
-  align-items: flex-start;
-  padding: 12px 8px 8px 10px;
+  min-height: 34px;
+  height: 34px;
+  align-items: center;
+  padding: 0 8px 0 10px;
+  background: #0d0c0b;
+}
+
+.main-thread-headline {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.main-thread-headline strong,
+.main-thread-headline span {
+  display: inline;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.main-thread-headline strong {
+  flex: 0 0 auto;
+  color: var(--bright);
+}
+
+.main-thread-headline .main-thread-adapter {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font: 9px/1.2 var(--mono);
+  letter-spacing: 0;
+}
+
+.main-thread-head-separator {
+  flex: 0 0 auto;
+  color: #5e5751;
+  font: 9px/1.2 var(--mono);
+}
+
+.main-thread-status {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font: 600 8px/1.2 var(--mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.main-thread-status.status-running,
+.main-thread-status.status-loading {
+  color: var(--yellow);
+}
+
+.main-thread-status.status-error,
+.main-thread-status.status-failed,
+.main-thread-status.status-interrupted {
+  color: var(--red);
+}
+
+.main-thread-status.status-completed,
+.main-thread-status.status-ready {
+  color: var(--green);
 }
 
 /* Structural labels and ordinary controls stay neutral. */
@@ -284,11 +339,11 @@ body.forge-resizing-thread * {
 }
 
 .main-thread-panel.collapsed .main-thread-head {
-  min-height: 80px;
-  height: 80px;
-  align-items: flex-start;
+  min-height: 34px;
+  height: 34px;
+  align-items: center;
   justify-content: center;
-  padding: 12px 5px;
+  padding: 0 5px;
 }
 
 @media (max-width: 1180px) {
@@ -302,7 +357,6 @@ body.forge-resizing-thread * {
     grid-template-rows: minmax(0, 1fr) 36px;
   }
 
-  .forge-thread-rail::before,
   .forge-thread-resizer {
     display: none;
   }
@@ -310,9 +364,9 @@ body.forge-resizing-thread * {
   .main-thread-head,
   .main-thread-panel.collapsed .main-thread-head {
     min-height: 32px;
-    height: auto;
+    height: 32px;
     align-items: center;
-    padding: 6px 8px 6px 10px;
+    padding: 0 8px 0 10px;
   }
 
   .side-title {
