@@ -117,6 +117,7 @@ The intended result is one coherent engineering workbench rather than three pane
 - On the desktop three-pane layout, the left workspace summary, central project header and Main Thread header share a coherent top baseline and vertical rhythm rather than appearing independently offset.
 - Major page regions are visibly denser than the original implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
 - Main thread, project/task/thread navigation and runtime information can coexist on a normal laptop viewport without unnecessary scrolling caused by decorative spacing.
+- Runtime event bursts do not expand the Event Log until it dominates the workbench or visually collapse an active task row.
 - All visible product UI text is English.
 - Keyboard navigation/focus remains usable and visible.
 - First-run Check, dispatch and cancel interactions remain understandable and do not regress behavior.
@@ -141,7 +142,10 @@ The intended result is one coherent engineering workbench rather than three pane
 - Rework pass merged to `dev` through PR `#14` at squash commit `71db8a3b4e8f397dbb327209eee12a907574fcdd`.
 - PR `#14` implements blue/cyan/yellow/violet technical role/state cues, distinct blue human vs orange assistant turns, real bounded/persistent Main Thread drag resizing with keyboard support, and the shared desktop top rhythm.
 - PR `#14` Verify run `33500817912` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` on final head `ed8978b7b4efd3c8b03089b850522d1c0bf40562`.
-- T017 remains `REVIEW` until the merged rework is visually smoked in the browser.
+- Human dispatch-start smoke on 2026-09-01 exposed a runtime-burst UI regression: repeated `dispatch.provider_event` rows dominated the Event Log and the active task row appeared visually compressed.
+- Runtime-burst hardening merged to `dev` through PR `#16` at squash commit `5e398bcc0debcf3cdac853240a296b32ecef44a2`; it bounds the Event Log, keeps its header sticky, shows only the newest low-level provider pulse while preserving lifecycle rows, and hardens active task-row sizing.
+- PR `#16` Verify run `33503825474` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
+- T017 remains `REVIEW` until the dispatch-start visual regression and the broader merged rework are visually accepted in the browser.
 
 ## Out of Scope
 
@@ -161,4 +165,4 @@ Resolved: the three desktop top regions should align as one coherent workbench w
 
 ## Handoff
 
-T017 rework is merged to `dev` and automated verification is green. Repeat the short browser smoke for color balance, human/assistant distinction, rail resizing/persistence and top-region alignment. Keep the task in `REVIEW` until that human visual acceptance is complete.
+T017 rework and the runtime-burst hardening are merged to `dev` with automated verification green. Repeat the short browser smoke, including starting a real Builder dispatch, and verify color balance, human/assistant distinction, rail resizing/persistence, top-region alignment, Event Log stability and active task-row readability. Keep the task in `REVIEW` until that human visual acceptance is complete.
