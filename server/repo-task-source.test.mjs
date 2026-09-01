@@ -56,6 +56,34 @@ test('resolves a repository ledger task to a small normalized task-card referenc
   })
 })
 
+test('reads bounded legacy localized task-card syntax without mutating repository truth', async (t) => {
+  const { root, project } = await fixture(t)
+  const cardPath = join(root, 'docs/workbench/tasks/T001-existing-task.md')
+  const legacy = '# T001：Existing task\n\n状态：**待实施**\n\n## Goal\nKeep truth in repo.\n'
+  await writeFile(cardPath, legacy, 'utf8')
+
+  const task = await resolveRepositoryTask(project, 'T001')
+  assert.equal(task.title, 'Existing task')
+  assert.equal(task.cardStatus, '待实施')
+  assert.deepEqual(task.warnings, ['ledger status TODO differs from task card status 待实施'])
+  assert.equal(await readFile(cardPath, 'utf8'), legacy)
+})
+
+test('explicit updates can normalize a touched legacy field without duplicating task metadata', async (t) => {
+  const { root, project } = await fixture(t)
+  const cardPath = join(root, 'docs/workbench/tasks/T001-existing-task.md')
+  await writeFile(cardPath, '# T001：Existing task\n\n状态：**待实施**\n\n## Goal\nKeep truth in repo.\n', 'utf8')
+
+  const updated = await updateRepositoryTask(project, 'T001', { status: 'REVIEW' })
+  assert.equal(updated.cardStatus, 'REVIEW')
+  assert.deepEqual(updated.warnings, [])
+
+  const card = await readFile(cardPath, 'utf8')
+  assert.match(card, /^# T001：Existing task$/m)
+  assert.match(card, /^Status: REVIEW$/m)
+  assert.doesNotMatch(card, /^状态\s*[:：]/m)
+})
+
 test('explicit create and update mutate repository truth and read back without runtime copies', async (t) => {
   const { project } = await fixture(t)
   const runtimeState = createEmptyState()

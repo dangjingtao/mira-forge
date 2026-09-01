@@ -156,24 +156,37 @@ async function cardPathForTask(paths, id, { required = true } = {}) {
   return actual
 }
 
+function stripSimpleMarkdownEmphasis(value) {
+  const text = value.trim()
+  const bold = text.match(/^\*\*(.+)\*\*$/)
+  return (bold?.[1] ?? text).trim()
+}
+
 function parseTaskCard(content, expectedId) {
-  const heading = content.match(/^#\s+([A-Za-z0-9][A-Za-z0-9._-]*)(?:\s+[—–-]\s+(.+?))?\s*$/m)
-  if (!heading) throw new Error(`task card ${expectedId} must contain a level-1 heading with its task ID`)
-  if (heading[1] !== expectedId) throw new Error(`task card heading ID ${heading[1]} does not match ${expectedId}`)
-  const status = content.match(/^Status:\s*(.+?)\s*$/m)
+  const headingLine = content.match(/^#\s+(.+?)\s*$/m)
+  if (!headingLine) throw new Error(`task card ${expectedId} must contain a level-1 heading with its task ID`)
+
+  const heading = headingLine[1].trim()
+  const headingId = heading.match(/^([A-Za-z0-9][A-Za-z0-9._-]*)(?=$|\s|[:：—–])/)?.[1]
+  if (!headingId) throw new Error(`task card ${expectedId} must contain a level-1 heading with its task ID`)
+  if (headingId !== expectedId) throw new Error(`task card heading ID ${headingId} does not match ${expectedId}`)
+
+  const titleTail = heading.slice(headingId.length).trim()
+  const title = titleTail.replace(/^(?:[—–-]|[:：])\s*/, '').trim() || expectedId
+  const status = content.match(/^(?:Status\s*:|状态\s*[:：])\s*(.+?)\s*$/m)
   if (!status || !status[1].trim()) throw new Error(`task card ${expectedId} must contain a Status line`)
-  return { title: heading[2]?.trim() || expectedId, status: status[1].trim() }
+  return { title, status: stripSimpleMarkdownEmphasis(status[1]) }
 }
 
 function replaceTaskCardFields(content, { id, title, status }) {
   let next = content
   if (title !== undefined) {
     const safeTitle = singleLine(title, 'title')
-    next = next.replace(/^#\s+[A-Za-z0-9][A-Za-z0-9._-]*(?:\s+[—–-]\s+.*?)?\s*$/m, `# ${id} — ${safeTitle}`)
+    next = next.replace(/^#\s+.+?\s*$/m, `# ${id} — ${safeTitle}`)
   }
   if (status !== undefined) {
     const safeStatus = singleLine(status, 'status')
-    next = next.replace(/^Status:\s*.+?\s*$/m, `Status: ${safeStatus}`)
+    next = next.replace(/^(?:Status\s*:|状态\s*[:：])\s*.+?\s*$/m, `Status: ${safeStatus}`)
   }
   parseTaskCard(next, id)
   return next

@@ -242,6 +242,14 @@ The v0.1 parser contract is intentionally tolerant:
 - project-specific statuses are allowed but opaque;
 - human prose may evolve without a schema migration.
 
+The canonical Task Card writer remains `# ID — Title` plus `Status: VALUE`. To avoid forcing an all-at-once migration of established repositories, Forge readers MAY support a small, explicit compatibility set when identity remains unambiguous. Forge v0.1 currently accepts:
+
+- a level-1 heading whose exact ID is followed by `:`, `：`, `—`, `–`, or ordinary whitespace before the human title;
+- the legacy localized status label `状态:` / `状态：` in addition to canonical `Status:`;
+- simple surrounding Markdown bold emphasis on a legacy status value, for example `状态：**待实施**`.
+
+These are **read-compatibility forms, not new canonical writer syntax**. Reads remain side-effect free. If an explicit Forge update touches a legacy title or status field, Forge may normalize that touched field to canonical syntax while preserving unrelated Task Card prose.
+
 Extensions MUST NOT change the meaning of the required `ID`, `Task`, or `Status` fields or make Task identity ambiguous.
 
 If Forge later needs machine-readable dependency, ownership, scheduling, or policy metadata, that syntax should be versioned explicitly rather than inferred from arbitrary prose.
