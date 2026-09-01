@@ -68,6 +68,19 @@ Visual smoke also exposed a strong false affordance: the fixed vertical divider 
 - At narrow layouts where Main Thread moves below the main surface, horizontal resize behavior is disabled rather than repurposed into a confusing vertical drag interaction.
 - The resize handle should provide an appropriate resize cursor and visible hover/focus affordance without becoming a large decorative gutter.
 
+## Top Alignment Follow-up
+
+The first desktop screen currently reads as three loosely stacked panes because the left workspace summary, central project header and Main Thread header do not share a consistent top rhythm.
+
+- Align the left workspace section, central project-status section and right Main Thread header to a shared visual top baseline where the desktop three-pane layout is active.
+- `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD` should follow compatible section-label typography, top padding and vertical rhythm even though their content differs.
+- The current workspace/project summary block and central project header should not appear vertically offset by unrelated padding rules.
+- Prefer shared spacing/header tokens or deliberate equal-height top regions over one-off pixel nudges.
+- Preserve compact density; alignment must not be achieved by simply making every header taller.
+- Narrow responsive layouts may diverge once panes stack, but should still avoid obvious accidental offsets within each stacked region.
+
+The intended result is one coherent engineering workbench rather than three panels that happen to sit beside each other.
+
 ## Hard Constraints
 
 - Do not remove keyboard-first interaction merely to simplify styling.
@@ -101,6 +114,7 @@ Visual smoke also exposed a strong false affordance: the fixed vertical divider 
 - Rail resizing has sensible bounds, keeps the rest of the workspace usable, and does not reset selection, focus, draft text or active thread state.
 - A chosen desktop rail width is restored after refresh where local UI persistence is available.
 - Narrow layouts do not expose a misleading horizontal resize affordance after the Main Thread rail moves below the main surface.
+- On the desktop three-pane layout, the left workspace summary, central project header and Main Thread header share a coherent top baseline and vertical rhythm rather than appearing independently offset.
 - Major page regions are visibly denser than the original implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
 - Main thread, project/task/thread navigation and runtime information can coexist on a normal laptop viewport without unnecessary scrolling caused by decorative spacing.
 - All visible product UI text is English.
@@ -123,6 +137,7 @@ Visual smoke also exposed a strong false affordance: the fixed vertical divider 
 - Human browser visual smoke initially accepted the restrained accent pass on 2026-08-31.
 - Later visual review on 2026-09-01 superseded that acceptance: the restraint pass was judged too color-sparse, human/AI conversation role separation needs stronger visual distinction, Mira orange should remain a visible primary color, and VS Code-like technical colors should be retained where semantically useful.
 - The same visual review identified the fixed Main Thread divider as a false resize affordance; T017 now requires a real bounded desktop drag-resize interaction with local UI preference persistence.
+- Follow-up visual review also identified misaligned top-region rhythm across `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD`; T017 now requires a shared desktop top baseline/spacing rhythm rather than independent pane offsets.
 
 ## Out of Scope
 
@@ -138,6 +153,8 @@ Resolved: Mira orange remains the primary brand color, but it coexists with neut
 
 Resolved: the right Main Thread divider should become a real desktop resize handle rather than being visually disguised as non-interactive chrome.
 
+Resolved: the three desktop top regions should align as one coherent workbench while preserving compact density.
+
 ## Handoff
 
-T017 is reopened to `REVIEW` for one focused visual/interaction pass. Keep the compact layout and `− / +` control; restore stronger human/AI role distinction and useful VS Code-like semantic colors, then implement bounded persistent desktop Main Thread rail resizing. Re-run automated checks and one short browser smoke before PASS.
+T017 is reopened to `REVIEW` for one focused visual/interaction pass. Keep the compact layout and `− / +` control; restore stronger human/AI role distinction and useful VS Code-like semantic colors, implement bounded persistent desktop Main Thread rail resizing, and align the left workspace summary, central project header and Main Thread header to one coherent top rhythm. Re-run automated checks and one short browser smoke before PASS.
