@@ -2,9 +2,16 @@ import { createBatch } from './domain.mjs'
 import { inspectRepositoryTaskSource, resolveRepositoryTask } from './repo-task-source.mjs'
 import { validateBatchDependencies } from './readiness.mjs'
 
+const DEFAULT_TASK_LEDGER = 'docs/workbench/00-work-ledger.md'
+const DEFAULT_TASK_DIR = 'docs/workbench/tasks'
+
 function requiredString(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`)
   return value.trim()
+}
+
+function optionalString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
 function projectForId(state, projectId) {
@@ -32,10 +39,10 @@ export async function resolveProjectTask(store, projectId, taskId) {
 }
 
 export async function configureProjectTaskSource(store, projectId, input) {
-  const taskLedger = requiredString(input?.taskLedger, 'taskLedger')
-  const taskDir = requiredString(input?.taskDir, 'taskDir')
   const snapshot = await store.read()
   const project = projectForId(snapshot, projectId)
+  const taskLedger = optionalString(input?.taskLedger) || optionalString(project.taskLedger) || DEFAULT_TASK_LEDGER
+  const taskDir = optionalString(input?.taskDir) || optionalString(project.taskDir) || DEFAULT_TASK_DIR
   const candidate = { ...project, taskLedger, taskDir }
 
   // Validate the repository paths and ledger/card contract before persisting them.
