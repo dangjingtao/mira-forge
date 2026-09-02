@@ -21,6 +21,8 @@ Do not add feature-card or task-card stylesheets such as `T018-*.css`, `*-fix.cs
 
 A component must not import a second competing stylesheet for rules already owned by the canonical style tree.
 
+`scripts/frontend-style-contract.test.mjs` guards the canonical file set, import order and single TSX stylesheet entrypoint in `npm test`. If the style ownership model intentionally changes, update this contract and the guard together.
+
 ## 2. Selector ownership
 
 A selector has one primary owner.
