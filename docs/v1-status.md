@@ -1,5 +1,7 @@
 # Mira Forge V1 Status
 
+> **Historical snapshot.** This document records the V1 acceptance state as of 2026-08-29 and is no longer the current product-status summary. For the current product model and capabilities through T018, see `docs/user-guide.zh-CN.md`; for authoritative task status, see `docs/workbench/00-work-ledger.md` and the latest Task Cards.
+
 **Snapshot date:** 2026-08-29
 **Branch:** `dev`
 **HEAD:** `0fb8a6018c8c2728429ede8f86aba9a29f78931e` (`0fb8a60`)
