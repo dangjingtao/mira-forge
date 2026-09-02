@@ -1,6 +1,6 @@
 # T017 — Compact Mira Web UI
 
-Status: REVIEW
+Status: PASS
 
 Depends on: T015 PASS.
 
@@ -172,7 +172,9 @@ T017 also owns the cleanup required to keep the accepted visual direction mainta
 - Follow-up PR `#19` removed the remaining reusable inline `ShortcutFeedback` style object, moved that surface into canonical `overlays.css`, and clarified transient-feedback ownership in the style contract. PR `#19` Verify run `33583025442` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` before merge at squash commit `4544f564dcfecf18969abfc958d2411c855c87a9`.
 - Final self-audit PR `#20` added executable style-ownership guards, corrected a cross-owner responsive selector and centralized the repeated danger-soft surface token. PR `#20` Verify run `33585496811` passed 94 tests plus typecheck, build and smoke; merged to `dev` at `3606820a654826ea7cf1a746bbb089b48cc31faf`, whose merged-tree Verify `33585561206` also passed all gates.
 - Final compatibility-tail PR `#21` retired unused legacy token aliases, extended the guard to prevent their return, and removed repository-task-picker `!important` specificity hacks by scoping rules to their owning overlay. PR `#21` Verify run `33585914016` passed all gates before merge at `f8be2138354caa1aa5e2f553f3fd43f4556cab61`; merged-tree push Verify `33585951385` also passed test, typecheck, build and smoke.
-- T017 remains `REVIEW` until the final structurally cleaned UI is visually accepted in the browser.
+- Component-first cleanup merged to `dev` through PR `#22` at squash commit `445221006b4b62dadbad150542d8f77e4dddebc6`; `App.tsx` was reduced to orchestration/state/API/keyboard responsibilities while workbench view regions and overlays were extracted into explicit `src/workbench/` components. Merged-tree Verify run `33594660837` passed test, typecheck, build and smoke.
+- Collapsible workspace rail follow-up merged through PR `#23` at squash commit `4da339bc1bcdd6d648fa599fbfe691d601b0c7c1`: desktop workspace navigation can collapse to a compact text-mark rail, keyboard activation opens basic workspace information, and the preference remains local UI state. The merged tree passed test, typecheck, build and smoke.
+- Human browser review accepted T017 on 2026-09-02 after the final componentization and workspace-rail follow-up.
 
 ## Out of Scope
 
@@ -194,4 +196,4 @@ Resolved: frontend style ownership is formalized before T018; future task-specif
 
 ## Handoff
 
-T017 UI implementation, runtime-burst hardening and frontend style-system cleanup are merged to `dev` with automated verification green. The final self-audit found no remaining code-level blocker after PR `#20` and PR `#21`. Repeat the short browser smoke including a real Builder dispatch. Verify color balance, human/assistant distinction, rail resizing/persistence, top-region rhythm, Event Log stability and active task-row readability. Keep T017 in `REVIEW` until that human visual acceptance is complete.
+T017 PASS. The compact Forge Web UI, Main Thread rail behavior, runtime-burst hardening, frontend style ownership, component boundaries and collapsible workspace navigation are accepted on `dev`. T018 may proceed without reopening T014-T016 runtime contracts or reintroducing task-specific visual override layers.
