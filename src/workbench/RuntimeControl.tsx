@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { buildLiveRuntimeRows } from './live-runtime-model.js'
 import type { Batch, Dispatch, MainThread, Review, RuntimeEvent, Session } from './model'
 import RuntimeEventLogModal from './RuntimeEventLogModal'
@@ -30,6 +30,7 @@ export default function RuntimeControl({
   onOpenMainThread,
 }: RuntimeControlProps) {
   const [openSurface, setOpenSurface] = useState<OpenSurface>(null)
+  const summaryRef = useRef<HTMLButtonElement>(null)
   const rows = useMemo(() => buildLiveRuntimeRows({
     projectId,
     batches,
@@ -41,9 +42,15 @@ export default function RuntimeControl({
   const activeCount = rows.filter((row) => row.active).length
   const attentionCount = rows.filter((row) => row.attention).length
 
+  function closeSurface() {
+    setOpenSurface(null)
+    window.setTimeout(() => summaryRef.current?.focus(), 0)
+  }
+
   return (
     <>
       <button
+        ref={summaryRef}
         className={`runtime-summary ${attentionCount ? 'has-attention' : ''}`}
         type="button"
         onClick={() => setOpenSurface('runtime')}
@@ -64,7 +71,7 @@ export default function RuntimeControl({
         <RuntimeInspectorModal
           rows={rows}
           batches={batches}
-          onClose={() => setOpenSurface(null)}
+          onClose={closeSurface}
           onOpenEvents={() => setOpenSurface('events')}
           onSelectTask={onSelectTask}
           onOpenMainThread={(nextProjectId, threadId) => {
@@ -77,7 +84,7 @@ export default function RuntimeControl({
       {openSurface === 'events' && (
         <RuntimeEventLogModal
           events={events}
-          onClose={() => setOpenSurface(null)}
+          onClose={closeSurface}
           onBack={() => setOpenSurface('runtime')}
         />
       )}
