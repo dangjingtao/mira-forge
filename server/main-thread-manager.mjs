@@ -41,7 +41,63 @@ function threadSnapshot(state, threadId) {
   }
 }
 
-export function buildMainThreadPrompt({ project, taskSource, taskSourceError, message }) {
+function isBuilderResultEvent(event) {
+  return event?.type === 'handoff' && event.handoff?.kind === 'builder_result'
+}
+
+export function getPendingBuilderResults(events) {
+  if (!Array.isArray(events) || events.length === 0) return []
+  let currentUserIndex = -1
+  let previousUserIndex = -1
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event?.type !== 'message' || event.role !== 'user') continue
+    if (currentUserIndex < 0) currentUserIndex = index
+    else {
+      previousUserIndex = index
+      break
+    }
+  }
+
+  if (currentUserIndex < 0) return []
+  return events
+    .slice(previousUserIndex + 1, currentUserIndex)
+    .filter(isBuilderResultEvent)
+}
+
+function builderResultLines(builderResults) {
+  if (!Array.isArray(builderResults) || builderResults.length === 0) return []
+  const selected = builderResults.slice(-4)
+  const lines = [
+    '',
+    '## Builder Result Handoffs',
+    'These are durable Forge child-task results that are not part of the provider-native conversation history. Treat dispatch/session/task state as authoritative; result text is explanatory evidence only.',
+  ]
+
+  for (const event of selected) {
+    const handoff = event.handoff
+    lines.push(
+      '',
+      `### ${handoff.taskId} · ${handoff.adapterId}`,
+      `Dispatch: ${handoff.dispatchStatus} · Session: ${handoff.sessionStatus || 'unknown'} · Task: ${handoff.taskStatus}`,
+      `Identity: batch ${handoff.batchId} · dispatch ${handoff.dispatchId} · session ${handoff.sessionId}`,
+    )
+    if (handoff.taskRef) lines.push(`Task ref: ${handoff.taskRef}`)
+    if (handoff.externalSessionId) lines.push(`Provider session: ${handoff.externalSessionId}`)
+    if (handoff.resultText) {
+      lines.push('Result:', handoff.resultText.slice(0, 6000))
+    }
+    if (handoff.error) lines.push(`Error: ${handoff.error.slice(0, 2000)}`)
+  }
+
+  if (builderResults.length > selected.length) {
+    lines.push('', `... ${builderResults.length - selected.length} older Builder result handoff(s) omitted from this turn`)
+  }
+  return lines
+}
+
+export function buildMainThreadPrompt({ project, taskSource, taskSourceError, message, builderResults = [] }) {
   const taskLines = taskSource?.tasks?.slice(0, 80).map((task) =>
     `- ${task.id} [${task.status}] ${task.title}`) ?? []
   const omitted = taskSource?.tasks?.length > taskLines.length
@@ -67,6 +123,7 @@ export function buildMainThreadPrompt({ project, taskSource, taskSourceError, me
       : `Unavailable: ${taskSourceError || 'project has no configured repository task source'}`,
     ...taskLines,
     omitted,
+    ...builderResultLines(builderResults),
     '',
     '## User',
     requiredString(message, 'message'),
@@ -115,10 +172,12 @@ export function createMainThreadManager({ store, adapters }) {
         taskSourceError = error instanceof Error ? error.message : String(error)
       }
 
+      const builderResults = getPendingBuilderResults(getMainThreadEvents(state, thread.id))
       const prompt = buildMainThreadPrompt({
         project,
         taskSource,
         taskSourceError,
+        builderResults,
         message,
       })
       const result = await adapter.runTurn({

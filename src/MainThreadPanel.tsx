@@ -136,6 +136,11 @@ function buildTimeline(events: ThreadEvent[]) {
       continue
     }
 
+    if (event.type === 'handoff' && isBuilderResultHandoff(event.handoff)) {
+      timeline.push({ kind: 'event', event })
+      continue
+    }
+
     if (!current) {
       timeline.push({ kind: 'event', event })
       continue

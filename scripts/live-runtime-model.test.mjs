@@ -98,4 +98,65 @@ test('live runtime mapping does not mark a Main Thread or task from another proj
 test('runtime duration uses observed timestamps without inventing progress', () => {
   assert.equal(formatRuntimeDuration('2026-09-02T00:00:00.000Z', '2026-09-02T00:01:05.000Z'), '1m 5s')
   assert.equal(formatRuntimeDuration(null, null), 'not started')
+
+  const input = fixture()
+  input.dispatches[0].status = 'starting'
+  input.sessions[0].status = 'starting'
+  input.sessions[0].startedAt = null
+  const starting = buildLiveRuntimeRows(input).find((row) => row.id === 'session:S-1')
+  assert.equal(starting.startedAt, null)
+  assert.equal(formatRuntimeDuration(starting.startedAt, starting.endedAt), 'not started')
+})
+
+test('a resolved historical failure becomes passive instead of permanent attention', () => {
+  const input = fixture()
+  input.dispatches[0].status = 'failed'
+  input.dispatches[0].error = 'old failure'
+  input.sessions[0].status = 'failed'
+  input.sessions[0].endedAt = '2026-09-02T00:02:00.000Z'
+  input.batches[0].tasks[0].status = 'interrupted'
+
+  let row = buildLiveRuntimeRows(input).find((item) => item.id === 'session:S-1')
+  assert.equal(row.attention, true)
+
+  input.batches[0].tasks[0].status = 'building'
+  row = buildLiveRuntimeRows(input).find((item) => item.id === 'session:S-1')
+  assert.equal(row.attention, false)
+})
+
+test('actionable rows are not truncated by the passive history cap', () => {
+  const tasks = [
+    { id: 'DEP', title: 'Dependency', status: 'waiting', builder: null, reviewRound: 0, dependsOn: [] },
+    ...Array.from({ length: 20 }, (_, index) => ({
+      id: `B${index + 1}`,
+      title: `Blocked ${index + 1}`,
+      status: 'waiting',
+      builder: null,
+      reviewRound: 0,
+      dependsOn: ['DEP'],
+    })),
+  ]
+  const rows = buildLiveRuntimeRows({
+    projectId: 'p1',
+    batches: [{ id: 'B-many', projectId: 'p1', name: 'Many blockers', status: 'planned', tasks }],
+    dispatches: [],
+    sessions: [],
+    reviews: [],
+    threads: [],
+  })
+
+  const blocked = rows.filter((row) => row.status === 'blocked')
+  assert.equal(blocked.length, 20)
+  assert.equal(blocked.every((row) => row.attention), true)
+})
+
+test('polling state changes keep stable row identity for the same durable session', () => {
+  const input = fixture()
+  const before = buildLiveRuntimeRows(input).find((row) => row.sessionId === 'S-1')
+  input.dispatches[0].updatedAt = '2026-09-02T00:04:00.000Z'
+  input.sessions[0].updatedAt = '2026-09-02T00:04:00.000Z'
+  const after = buildLiveRuntimeRows(input).find((row) => row.sessionId === 'S-1')
+
+  assert.equal(before.id, 'session:S-1')
+  assert.equal(after.id, before.id)
 })
