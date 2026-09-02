@@ -15,7 +15,7 @@ It imports these files in this order:
 3. `shell.css` — application frame, top bar, workspace navigation, pane layout and responsive shell;
 4. `workbench.css` — project/task/batch/runtime surfaces;
 5. `main-thread.css` — Main Thread conversation, process timeline and composer;
-6. `overlays.css` — modal, command palette, task picker and first-run acceptance surfaces.
+6. `overlays.css` — modal, command palette, task picker, first-run acceptance and transient feedback surfaces.
 
 Do not add feature-card or task-card stylesheets such as `T018-*.css`, `*-fix.css`, `visual-override.css`, or `restraint.css`.
 
@@ -28,7 +28,7 @@ A selector has one primary owner.
 - Shell/layout selectors (`.forge-*`, `.topbar`, `.workspace`, `.sidebar`, `.pane-head`) belong in `shell.css`.
 - Task/runtime selectors (`.batch`, `.task-*`, `.event-*`, `.runtime-event`, `.stream-*`) belong in `workbench.css`.
 - `.main-thread-*` selectors belong in `main-thread.css`.
-- Modal, palette, repository task picker and `.acceptance-*` selectors belong in `overlays.css`.
+- Modal, palette, repository task picker, transient feedback and `.acceptance-*` selectors belong in `overlays.css`.
 - Global element rules belong in `base.css`.
 
 Do not solve a visual bug by redefining the same selector later in another file. Move or edit the owning rule instead.
