@@ -25,7 +25,9 @@ export default function ProjectSidebar({
   onSelectProject,
   onNewProject,
 }: ProjectSidebarProps) {
-  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem(collapsedPreferenceKey) === '1')
+  const [collapsed, setCollapsed] = useState(() => (
+    typeof window !== 'undefined' && window.localStorage.getItem(collapsedPreferenceKey) === '1'
+  ))
   const [infoProjectId, setInfoProjectId] = useState<string | null>(null)
 
   useEffect(() => {
