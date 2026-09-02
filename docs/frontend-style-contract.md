@@ -93,7 +93,10 @@ The Main Thread rail may resize only in desktop rail mode. Its width is local UI
 Avoid growing a second kind of override pile in TSX.
 
 - `main.tsx` owns application composition and shell-only UI preference behavior.
-- `App.tsx` owns control-plane orchestration, but new stateful feature surfaces should be extracted instead of continuously expanding the file.
+- `App.tsx` owns control-plane state, polling, API actions and keyboard orchestration. It should compose view components instead of owning large product markup blocks.
+- `src/workbench/` owns control-plane view components and the small shared UI projection model used by those components.
+- `RuntimePane.tsx` is the runtime-area composition boundary; substantial runtime sub-surfaces such as batch/task lists and event streams should have their own component owners before T018 expands them.
+- Modal and command surfaces should remain explicit components rather than returning to conditional JSX blocks inside `App.tsx`.
 - `MainThreadPanel.tsx` owns durable conversation behavior, not global shell styling.
 - A new substantial UI surface should have one clear component owner and one clear stylesheet owner.
 - Do not introduce inline style objects for reusable visual rules; use CSS variables only when runtime values must cross into layout (for example the rail width).
