@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { buildLiveRuntimeRows } from './live-runtime-model.js'
 import type { Batch, Dispatch, MainThread, Review, RuntimeEvent, Session } from './model'
 import RuntimeEventLogModal from './RuntimeEventLogModal'
@@ -40,24 +40,6 @@ export default function RuntimeControl({
   }), [batches, dispatches, projectId, reviews, sessions, threads])
   const activeCount = rows.filter((row) => row.active).length
   const attentionCount = rows.filter((row) => row.attention).length
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (!openSurface) return
-      const target = event.target as HTMLElement
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setOpenSurface(null)
-      } else if (event.key.toLowerCase() === 'e') {
-        event.preventDefault()
-        setOpenSurface('events')
-      }
-    }
-
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [openSurface])
 
   return (
     <>
