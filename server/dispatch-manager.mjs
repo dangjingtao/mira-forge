@@ -19,6 +19,7 @@ import {
   PIAGENT_ADAPTER_ID,
   resolveBuilderAdapterId,
 } from './builder-contract.mjs'
+import { appendBuilderResultHandoff } from './main-thread-domain.mjs'
 import { getDispatchReadiness } from './readiness.mjs'
 
 const ACTIVE_SESSION_STATUSES = ['starting', 'running', 'waiting']
@@ -51,6 +52,15 @@ function resolveBinding(state, batchId, taskId) {
   const project = state.projects.find((item) => item.id === batch.projectId)
   if (!project) throw new Error('project not found')
   return { project, batch, task }
+}
+
+function resolveSourceThread(state, projectId, sourceThreadId) {
+  const id = optionalString(sourceThreadId)
+  if (!id) return null
+  const thread = (state.threads ?? []).find((item) => item.id === id)
+  if (!thread) throw new Error('sourceThreadId not found')
+  if (thread.projectId !== projectId) throw new Error('sourceThreadId does not match dispatch project')
+  return thread
 }
 
 function ensureBuilderAdapter(state, adapterId) {
@@ -157,6 +167,27 @@ function dispatchEvent(state, dispatch, type, data = {}) {
   })
 }
 
+function deliverBuilderResult(state, dispatch, task, session) {
+  if (!dispatch.sourceThreadId) return null
+  return appendBuilderResultHandoff(state, dispatch.sourceThreadId, {
+    projectId: dispatch.projectId,
+    batchId: dispatch.batchId,
+    taskId: dispatch.taskId,
+    taskRef: dispatch.taskRef,
+    dispatchId: dispatch.id,
+    sessionId: dispatch.sessionId,
+    adapterId: dispatch.adapterId,
+    dispatchStatus: dispatch.status,
+    sessionStatus: session?.status ?? null,
+    taskStatus: task.status,
+    externalSessionId: dispatch.externalSessionId,
+    resultText: dispatch.resultText,
+    error: dispatch.error,
+    startedAt: dispatch.startedAt,
+    endedAt: dispatch.endedAt,
+  })
+}
+
 export function createDispatchManager({ store, runners }) {
   if (!store?.read || !store?.mutate) throw new Error('store is required')
   if (!(runners instanceof Map)) throw new Error('runners must be a Map')
@@ -244,6 +275,7 @@ export function createDispatchManager({ store, runners }) {
           message,
         })
       }
+      deliverBuilderResult(state, dispatch, task, session)
       return dispatch
     })
   }
@@ -263,6 +295,7 @@ export function createDispatchManager({ store, runners }) {
         error: optionalString(details.stderr) || message,
       })
       dispatchEvent(state, dispatch, 'dispatch.failed', { message })
+      deliverBuilderResult(state, dispatch, task, session)
       return dispatch
     })
   }
@@ -289,6 +322,7 @@ export function createDispatchManager({ store, runners }) {
         throw new Error(`builder dispatch already active: ${activeBuilderDispatch.id}`)
       }
 
+      const sourceThread = resolveSourceThread(state, binding.project.id, input.sourceThreadId)
       const promptInfo = resolvePrompt(input, binding)
       const session = createSession(state, {
         role: 'builder',
@@ -304,6 +338,7 @@ export function createDispatchManager({ store, runners }) {
         taskId,
         adapterId: adapter.id,
         sessionId: session.id,
+        sourceThreadId: sourceThread?.id ?? null,
         promptSource: promptInfo.promptSource,
         taskRef: promptInfo.taskRef,
         model: input.model,
@@ -313,6 +348,7 @@ export function createDispatchManager({ store, runners }) {
         adapterId: adapter.id,
         promptSource: dispatch.promptSource,
         taskRef: dispatch.taskRef,
+        sourceThreadId: dispatch.sourceThreadId,
       })
       return {
         dispatch: structuredClone(dispatch),
@@ -353,6 +389,7 @@ export function createDispatchManager({ store, runners }) {
       heartbeatAdapter(state, dispatch.adapterId, { status: 'available' })
       transitionDispatch(state, dispatch.id, 'cancelled', { signal: 'SIGTERM' })
       dispatchEvent(state, dispatch, 'dispatch.cancelled', {})
+      deliverBuilderResult(state, dispatch, task, session)
       return { dispatch: structuredClone(dispatch), changed: true }
     })
 
@@ -379,6 +416,7 @@ export function createDispatchManager({ store, runners }) {
         }
         transitionDispatch(state, dispatch.id, 'interrupted', { error: 'control plane restarted; process supervision was lost' })
         dispatchEvent(state, dispatch, 'dispatch.interrupted', { reason: 'control_plane_restart' })
+        deliverBuilderResult(state, dispatch, binding.task, session)
         count += 1
       }
       return count
@@ -399,6 +437,7 @@ export function createDispatchManager({ store, runners }) {
         heartbeatAdapter(state, dispatch.adapterId, { status: 'offline' })
         transitionDispatch(state, dispatch.id, 'interrupted', { signal: 'SIGTERM', error: 'control plane shutdown' })
         dispatchEvent(state, dispatch, 'dispatch.interrupted', { reason: 'control_plane_shutdown' })
+        deliverBuilderResult(state, dispatch, task, session)
         return dispatch
       })
       handles.delete(id)
