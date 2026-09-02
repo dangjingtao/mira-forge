@@ -1,5 +1,4 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import './main-thread.css'
 
 type MainThreadAdapter = 'opencode' | 'codex-desktop' | 'codex'
 
