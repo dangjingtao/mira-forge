@@ -167,8 +167,9 @@ T017 also owns the cleanup required to keep the accepted visual direction mainta
 - Human dispatch-start smoke on 2026-09-01 exposed a runtime-burst UI regression: repeated `dispatch.provider_event` rows dominated the Event Log and the active task row appeared visually compressed.
 - Runtime-burst hardening merged to `dev` through PR `#16` at squash commit `5e398bcc0debcf3cdac853240a296b32ecef44a2`; it bounds the Event Log, keeps its header sticky, shows only the newest low-level provider pulse while preserving lifecycle rows, and hardens active task-row sizing.
 - PR `#16` Verify run `33503825474` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
-- Frontend maintainability cleanup is implemented in PR `#18`: the historical root/task/visual/component CSS layers are replaced by the canonical `src/styles/` ownership tree, semantic tokens are centralized, and `docs/frontend-style-contract.md` is bound from `AGENTS.md`.
-- PR `#18` Verify run `33582718853` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` before the task-card documentation update; the final PR head must re-run verification before merge.
+- Frontend maintainability cleanup merged to `dev` through PR `#18` at squash commit `e9f7cf52e002c98f497d466ae4192e2ed76b9dc2`: historical root/task/visual/component CSS layers were replaced by the canonical `src/styles/` ownership tree, semantic tokens were centralized, and `docs/frontend-style-contract.md` was bound from `AGENTS.md`.
+- PR `#18` Verify run `33582718853` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` on the implementation head. After squash merge, `dev` Verify run `33582823030` passed the same four gates on the merged final tree.
+- Follow-up PR `#19` removed the remaining reusable inline `ShortcutFeedback` style object, moved that surface into canonical `overlays.css`, and clarified transient-feedback ownership in the style contract. PR `#19` Verify run `33583025442` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` before merge at squash commit `4544f564dcfecf18969abfc958d2411c855c87a9`.
 - T017 remains `REVIEW` until the structurally cleaned UI is visually smoked in the browser.
 
 ## Out of Scope
@@ -191,4 +192,4 @@ Resolved: frontend style ownership is formalized before T018; future task-specif
 
 ## Handoff
 
-T017 UI implementation, runtime-burst hardening and frontend style-system cleanup are in review. Automated verification must be green on the final PR head, then repeat the short browser smoke including a real Builder dispatch. Verify color balance, human/assistant distinction, rail resizing/persistence, top-region rhythm, Event Log stability and active task-row readability. Keep T017 in `REVIEW` until that human visual acceptance is complete.
+T017 UI implementation, runtime-burst hardening and frontend style-system cleanup are merged to `dev` with automated verification green. Repeat the short browser smoke including a real Builder dispatch. Verify color balance, human/assistant distinction, rail resizing/persistence, top-region rhythm, Event Log stability and active task-row readability. Keep T017 in `REVIEW` until that human visual acceptance is complete.
