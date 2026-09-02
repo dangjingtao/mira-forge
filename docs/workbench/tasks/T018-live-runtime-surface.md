@@ -91,7 +91,7 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 
 ## Delivery Evidence
 
-- Implementation is proposed in PR `#24` from `task/T018-live-runtime-surface` to `dev`.
+- Implementation merged to `dev` through PR `#24` at squash commit `fa385d031e038d1d600cce532a14a53c2e0547ed`.
 - Builder dispatches may explicitly bind a `sourceThreadId` only when the selected Main Thread belongs to the same project. Blank/default dispatch remains independent and receives no Main Thread conversation history.
 - Terminal Builder states (`completed`, `failed`, `cancelled`, restart/shutdown interruption) write one durable `builder_result` handoff to the explicitly related Main Thread with authoritative project/batch/task/dispatch/session identity, provider/session metadata, terminal task state, bounded `resultText` and error evidence where available.
 - Handoff append is idempotent by related Main Thread plus dispatch identity, so polling or restart reconstruction cannot append the same child result repeatedly.
@@ -101,7 +101,7 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 - Main Thread renders terminal Builder handoffs as readable result cards while preserving the original T015 reference-only handoff shape.
 - Existing two-second `/api/state` polling remains the runtime transport; no SSE/WebSocket, new permissions, auto-merge or conversation-context injection was introduced.
 - Automated regression coverage includes state-to-live-UI mapping, duration semantics, project isolation, result-handoff identity/idempotency, cross-project binding rejection, terminal completion correlation and restart interruption handoff.
-- PR `#24` Verify job passed `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke` on implementation head `285de02128fb38d2e552fd192e34e64c309e951c` before the documentation-only evidence update.
+- PR `#24` final Verify run `33597035459` passed `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke` on final PR head `9c5aa1fe506c5dd2fcb6b2166ac5ab264115a86c`.
 - Final acceptance remains intentionally in `REVIEW` until one real Builder dispatch is observed through the product UI/runtime and confirms the live row plus terminal Main Thread result handoff on the actual local provider path. This is the only remaining task-card acceptance item not reproducible by repository automation in the current execution environment.
 
 ## Out of Scope
