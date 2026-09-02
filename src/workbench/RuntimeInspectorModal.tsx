@@ -3,6 +3,7 @@ import { formatRuntimeDuration } from './live-runtime-model.js'
 import type { LiveRuntimeRow } from './live-runtime-model.js'
 import type { Batch } from './model'
 import { formatTime, taskKey } from './model'
+import ModalFrame from './ModalFrame'
 import RuntimeRowDetail from './RuntimeRowDetail'
 
 type RuntimeInspectorModalProps = {
@@ -70,99 +71,88 @@ export default function RuntimeInspectorModal({
   }
 
   return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
-      onKeyDown={(event) => {
-        event.stopPropagation()
-        if (event.key === 'Escape') {
-          event.preventDefault()
-          onClose()
-        } else if (event.key.toLowerCase() === 'e') {
-          event.preventDefault()
-          onOpenEvents()
-        }
-      }}
+    <ModalFrame
+      className="runtime-inspector-modal"
+      labelledBy="runtime-inspector-title"
+      onClose={onClose}
+      shortcuts={{ e: onOpenEvents }}
     >
-      <section className="runtime-inspector-modal" role="dialog" aria-modal="true" aria-labelledby="runtime-inspector-title">
-        <header className="runtime-inspector-head">
-          <div>
-            <strong id="runtime-inspector-title">RUNTIME INSPECTOR</strong>
-            <span>{rows.filter((row) => row.active).length} active · {rows.filter((row) => row.attention).length} attention</span>
-          </div>
-          <div className="runtime-inspector-actions">
-            <button type="button" onClick={onOpenEvents}><kbd>e</kbd> events</button>
-            <button type="button" onClick={onClose} autoFocus={!rows.length}><kbd>esc</kbd> close</button>
-          </div>
-        </header>
-
-        <div className="runtime-inspector-body">
-          <section className="runtime-inspector-section" aria-labelledby="runtime-work-title">
-            <div className="runtime-inspector-section-title" id="runtime-work-title">BUILDER / REVIEW <span>{workRows.length}</span></div>
-            {workRows.length ? (
-              <div className="runtime-inspector-list">
-                {workRows.map((row, index) => (
-                  <button
-                    className={`runtime-inspector-row tone-${rowTone(row)} ${row.id === selectedRowId ? 'selected' : ''}`}
-                    type="button"
-                    key={row.id}
-                    onClick={() => openWorkRow(row)}
-                    autoFocus={index === 0}
-                  >
-                    <span className="runtime-inspector-kind">{rowKind(row)}</span>
-                    <span className="runtime-inspector-copy">
-                      <strong>{row.taskId ? `${row.taskId} · ${row.title}` : row.title}</strong>
-                      <small>{relationLabel(row)}</small>
-                    </span>
-                    <span className="runtime-inspector-time">{timeLabel(row, now)}</span>
-                    <span className="runtime-inspector-states">
-                      <b className={`runtime-state state-${row.status}`}>{row.status.replaceAll('_', ' ')}</b>
-                      {row.taskStatus && row.taskStatus !== row.status && (
-                        <b className={`runtime-state state-${row.taskStatus}`}>task {row.taskStatus.replaceAll('_', ' ')}</b>
-                      )}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : <p className="runtime-inspector-empty">No Builder or review runtime for this project.</p>}
-          </section>
-
-          <section className="runtime-inspector-section" aria-labelledby="runtime-main-title">
-            <div className="runtime-inspector-section-title" id="runtime-main-title">MAIN THREADS <span>{mainRows.length}</span></div>
-            {mainRows.length ? (
-              <div className="runtime-inspector-list">
-                {mainRows.map((row, index) => (
-                  <button
-                    className={`runtime-inspector-row tone-${rowTone(row)}`}
-                    type="button"
-                    key={row.id}
-                    onClick={() => row.threadId && onOpenMainThread(row.projectId, row.threadId)}
-                    autoFocus={!workRows.length && index === 0}
-                  >
-                    <span className="runtime-inspector-kind">MAIN</span>
-                    <span className="runtime-inspector-copy">
-                      <strong>{row.title}</strong>
-                      <small>{relationLabel(row)}</small>
-                    </span>
-                    <span className="runtime-inspector-time">{timeLabel(row, now)}</span>
-                    <span className="runtime-inspector-states">
-                      <b className={`runtime-state state-${row.status}`}>{row.status.replaceAll('_', ' ')}</b>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : <p className="runtime-inspector-empty">No Main Thread runtime for this project.</p>}
-          </section>
-
-          {selectedRow && selectedRow.kind !== 'main' && (
-            <RuntimeRowDetail
-              row={selectedRow}
-              onOpenMainThread={selectedRow.threadId ? () => onOpenMainThread(selectedRow.projectId, selectedRow.threadId!) : undefined}
-            />
-          )}
+      <header className="runtime-inspector-head">
+        <div>
+          <strong id="runtime-inspector-title">RUNTIME INSPECTOR</strong>
+          <span>{rows.filter((row) => row.active).length} active · {rows.filter((row) => row.attention).length} attention</span>
         </div>
-      </section>
-    </div>
+        <div className="runtime-inspector-actions">
+          <button type="button" onClick={onOpenEvents}><kbd>e</kbd> events</button>
+          <button type="button" onClick={onClose} autoFocus={!rows.length}><kbd>esc</kbd> close</button>
+        </div>
+      </header>
+
+      <div className="runtime-inspector-body">
+        <section className="runtime-inspector-section" aria-labelledby="runtime-work-title">
+          <div className="runtime-inspector-section-title" id="runtime-work-title">BUILDER / REVIEW <span>{workRows.length}</span></div>
+          {workRows.length ? (
+            <div className="runtime-inspector-list">
+              {workRows.map((row, index) => (
+                <button
+                  className={`runtime-inspector-row tone-${rowTone(row)} ${row.id === selectedRowId ? 'selected' : ''}`}
+                  type="button"
+                  key={row.id}
+                  onClick={() => openWorkRow(row)}
+                  autoFocus={index === 0}
+                >
+                  <span className="runtime-inspector-kind">{rowKind(row)}</span>
+                  <span className="runtime-inspector-copy">
+                    <strong>{row.taskId ? `${row.taskId} · ${row.title}` : row.title}</strong>
+                    <small>{relationLabel(row)}</small>
+                  </span>
+                  <span className="runtime-inspector-time">{timeLabel(row, now)}</span>
+                  <span className="runtime-inspector-states">
+                    <b className={`runtime-state state-${row.status}`}>{row.status.replaceAll('_', ' ')}</b>
+                    {row.taskStatus && row.taskStatus !== row.status && (
+                      <b className={`runtime-state state-${row.taskStatus}`}>task {row.taskStatus.replaceAll('_', ' ')}</b>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="runtime-inspector-empty">No Builder or review runtime for this project.</p>}
+        </section>
+
+        <section className="runtime-inspector-section" aria-labelledby="runtime-main-title">
+          <div className="runtime-inspector-section-title" id="runtime-main-title">MAIN THREADS <span>{mainRows.length}</span></div>
+          {mainRows.length ? (
+            <div className="runtime-inspector-list">
+              {mainRows.map((row, index) => (
+                <button
+                  className={`runtime-inspector-row tone-${rowTone(row)}`}
+                  type="button"
+                  key={row.id}
+                  onClick={() => row.threadId && onOpenMainThread(row.projectId, row.threadId)}
+                  autoFocus={!workRows.length && index === 0}
+                >
+                  <span className="runtime-inspector-kind">MAIN</span>
+                  <span className="runtime-inspector-copy">
+                    <strong>{row.title}</strong>
+                    <small>{relationLabel(row)}</small>
+                  </span>
+                  <span className="runtime-inspector-time">{timeLabel(row, now)}</span>
+                  <span className="runtime-inspector-states">
+                    <b className={`runtime-state state-${row.status}`}>{row.status.replaceAll('_', ' ')}</b>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="runtime-inspector-empty">No Main Thread runtime for this project.</p>}
+        </section>
+
+        {selectedRow && selectedRow.kind !== 'main' && (
+          <RuntimeRowDetail
+            row={selectedRow}
+            onOpenMainThread={selectedRow.threadId ? () => onOpenMainThread(selectedRow.projectId, selectedRow.threadId!) : undefined}
+          />
+        )}
+      </div>
+    </ModalFrame>
   )
 }
