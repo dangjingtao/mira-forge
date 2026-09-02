@@ -354,7 +354,7 @@
 .main-thread-error {
   padding: 6px 8px;
   border-top: 1px solid var(--border-default);
-  background: rgba(216, 119, 113, .05);
+  background: var(--color-danger-soft);
   color: var(--color-danger);
 }
 

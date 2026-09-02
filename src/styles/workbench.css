@@ -1,7 +1,7 @@
 .error-line {
   padding: 7px var(--content-gutter);
   border-bottom: 1px solid var(--border-default);
-  background: rgba(216, 119, 113, .05);
+  background: var(--color-danger-soft);
   color: var(--color-danger);
   font-size: 10px;
 }
@@ -375,7 +375,6 @@
 
   .task-meta,
   .stream-meta,
-  .repo-task-state,
   .event-detail {
     display: none;
   }
