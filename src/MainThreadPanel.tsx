@@ -1,4 +1,6 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MAIN_THREAD_FOCUS_EVENT } from './main-thread-focus'
+import type { MainThreadFocusDetail } from './main-thread-focus'
 
 type MainThreadAdapter = 'opencode' | 'codex-desktop' | 'codex'
 
@@ -20,6 +22,32 @@ type MainThread = {
   updatedAt: string
 }
 
+type DispatchRequestHandoff = {
+  projectId: string
+  taskId: string
+  taskRef: string
+  preferredBuilder: string
+}
+
+type BuilderResultHandoff = {
+  kind: 'builder_result'
+  projectId: string
+  batchId: string
+  taskId: string
+  taskRef: string | null
+  dispatchId: string
+  sessionId: string
+  adapterId: string
+  dispatchStatus: string
+  sessionStatus: string | null
+  taskStatus: string
+  externalSessionId: string | null
+  resultText: string | null
+  error: string | null
+  startedAt: string | null
+  endedAt: string | null
+}
+
 type ThreadEvent = {
   id: string
   type: 'message' | 'thinking' | 'tool' | 'status' | 'artifact' | 'handoff'
@@ -27,12 +55,7 @@ type ThreadEvent = {
   text: string | null
   tool: { name: string; status: string | null } | null
   artifact: { kind: string; ref: string | null } | null
-  handoff: {
-    projectId: string
-    taskId: string
-    taskRef: string
-    preferredBuilder: string
-  } | null
+  handoff: DispatchRequestHandoff | BuilderResultHandoff | null
   createdAt: string
 }
 
@@ -58,16 +81,28 @@ function parseErrorBody(body: unknown, fallback: string) {
   return fallback
 }
 
+function isBuilderResultHandoff(handoff: ThreadEvent['handoff']): handoff is BuilderResultHandoff {
+  return Boolean(handoff && 'kind' in handoff && handoff.kind === 'builder_result')
+}
+
 function eventLabel(event: ThreadEvent) {
   if (event.type === 'message') return event.role || 'message'
   if (event.type === 'thinking') return 'thinking'
   if (event.type === 'tool') return event.tool?.name || 'tool'
   if (event.type === 'artifact') return event.artifact?.kind || 'artifact'
-  if (event.type === 'handoff') return `handoff · ${event.handoff?.taskId || 'task'}`
+  if (event.type === 'handoff') {
+    if (isBuilderResultHandoff(event.handoff)) return `builder result · ${event.handoff.taskId}`
+    return `handoff · ${event.handoff?.taskId || 'task'}`
+  }
   return event.text || 'status'
 }
 
 function eventTone(event: ThreadEvent) {
+  if (event.type === 'handoff' && isBuilderResultHandoff(event.handoff)) {
+    if (['failed', 'cancelled', 'interrupted'].includes(event.handoff.dispatchStatus)) return 'tone-error'
+    if (event.handoff.taskStatus === 'reviewing') return 'tone-running'
+    if (event.handoff.dispatchStatus === 'completed') return 'tone-success'
+  }
   if (event.type !== 'status' || !event.text) return ''
   if (event.text.startsWith('turn.completed')) return 'tone-success'
   if (event.text.startsWith('turn.failed') || event.text.startsWith('turn.interrupted')) return 'tone-error'
@@ -121,12 +156,33 @@ function buildTimeline(events: ThreadEvent[]) {
   return timeline
 }
 
+function BuilderResultView({ handoff }: { handoff: BuilderResultHandoff }) {
+  return (
+    <div className="main-thread-builder-result">
+      <div className="main-thread-builder-result-head">
+        <strong>{handoff.adapterId}</strong>
+        <span className={`builder-result-status status-${handoff.dispatchStatus}`}>dispatch {handoff.dispatchStatus}</span>
+        <span className={`builder-result-status status-${handoff.taskStatus}`}>task {handoff.taskStatus.replaceAll('_', ' ')}</span>
+      </div>
+      {handoff.resultText && <pre>{handoff.resultText}</pre>}
+      {handoff.error && <p className="builder-result-error">{handoff.error}</p>}
+      <div className="main-thread-builder-result-refs">
+        <code>{handoff.batchId}</code>
+        <code>{handoff.dispatchId}</code>
+        <code>{handoff.sessionId}</code>
+        {handoff.externalSessionId && <code>{handoff.externalSessionId}</code>}
+      </div>
+    </div>
+  )
+}
+
 function ThreadEventView({ event }: { event: ThreadEvent }) {
   return (
     <div className={`main-thread-event event-${event.type} role-${event.role || 'system'} ${eventTone(event)}`}>
       <span>{eventLabel(event)}</span>
       {(event.type === 'message' || event.type === 'thinking') && <p>{event.text}</p>}
-      {event.type === 'handoff' && event.handoff && (
+      {event.type === 'handoff' && isBuilderResultHandoff(event.handoff) && <BuilderResultView handoff={event.handoff} />}
+      {event.type === 'handoff' && event.handoff && !isBuilderResultHandoff(event.handoff) && (
         <p>{event.handoff.taskRef} → {event.handoff.preferredBuilder}</p>
       )}
       {event.type === 'artifact' && event.artifact?.ref && <p>{event.artifact.ref}</p>}
@@ -137,6 +193,7 @@ function ThreadEventView({ event }: { event: ThreadEvent }) {
 }
 
 function MainThreadPanel() {
+  const panelRef = useRef<HTMLElement>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [projectId, setProjectId] = useState('')
@@ -206,6 +263,20 @@ function MainThreadPanel() {
     return () => window.clearInterval(timer)
   }, [loadSnapshot, sending, snapshot?.thread.status, threadId])
 
+  useEffect(() => {
+    function onFocusMainThread(event: Event) {
+      const detail = (event as CustomEvent<MainThreadFocusDetail>).detail
+      if (!detail?.projectId || !detail.threadId) return
+      setProjectId(detail.projectId)
+      setThreadId(detail.threadId)
+      setCollapsed(false)
+      window.setTimeout(() => panelRef.current?.focus({ preventScroll: false }), 0)
+    }
+
+    window.addEventListener(MAIN_THREAD_FOCUS_EVENT, onFocusMainThread)
+    return () => window.removeEventListener(MAIN_THREAD_FOCUS_EVENT, onFocusMainThread)
+  }, [])
+
   const visibleEvents = useMemo(() => snapshot?.events.slice(-100) ?? [], [snapshot?.events])
   const timeline = useMemo(() => buildTimeline(visibleEvents), [visibleEvents])
   const threadAdapter = snapshot?.thread.adapter ?? adapter
@@ -267,7 +338,7 @@ function MainThreadPanel() {
   }
 
   return (
-    <section className={`main-thread-panel ${collapsed ? 'collapsed' : ''}`} aria-label="main thread">
+    <section ref={panelRef} tabIndex={-1} className={`main-thread-panel ${collapsed ? 'collapsed' : ''}`} aria-label="main thread">
       <header className="main-thread-head">
         <div className="main-thread-headline">
           <strong>MAIN THREAD</strong>
