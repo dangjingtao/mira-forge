@@ -1,6 +1,5 @@
 import BatchList from './BatchList'
-import LiveRuntimeSurface from './LiveRuntimeSurface'
-import RuntimeEventLog from './RuntimeEventLog'
+import RuntimeControl from './RuntimeControl'
 import type { Batch, Dispatch, MainThread, Project, Review, RuntimeEvent, Session, WorkbenchStats } from './model'
 
 type RuntimePaneProps = {
@@ -69,12 +68,12 @@ export default function RuntimePane({
           </div>
 
           <div className="stream-label">
-            <span className="stream-heading">RUNTIME STREAM</span>
+            <span className="stream-heading">CURRENT WORK</span>
             <div className="stream-right">
               <span className="stream-meta">
                 {activeBuilderDispatch
                   ? `${activeBuilderDispatch.adapterId} busy · ${activeBuilderDispatch.taskId}`
-                  : `${selectedEvents.length} events · ${batches.length} batches`}
+                  : `${batches.length} batches`}
               </span>
               <button className="stream-action" type="button" onClick={onNewBatch}>
                 + batch <kbd>b</kbd>
@@ -82,16 +81,18 @@ export default function RuntimePane({
             </div>
           </div>
 
-          <LiveRuntimeSurface
+          <RuntimeControl
             projectId={selected.id}
             batches={batches}
             dispatches={dispatches}
             sessions={sessions}
             reviews={reviews}
             threads={threads}
+            events={selectedEvents}
             onSelectTask={onSelectTask}
             onOpenMainThread={onOpenMainThread}
           />
+
           <BatchList
             batches={batches}
             dispatches={dispatches}
@@ -99,7 +100,6 @@ export default function RuntimePane({
             onSelectTask={onSelectTask}
             onNewBatch={onNewBatch}
           />
-          <RuntimeEventLog events={selectedEvents} />
         </>
       ) : (
         <div className="empty-workspace">
