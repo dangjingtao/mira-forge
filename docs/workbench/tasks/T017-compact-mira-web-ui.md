@@ -14,11 +14,12 @@ The target is not a large "professional-looking" dashboard. The interface should
 
 - `AGENTS.md`
 - `docs/tui-interaction.md`
+- `docs/frontend-style-contract.md`
 - `docs/workbench/tasks/T015-main-thread-runtime.md`
 - `src/App.tsx`
-- `src/styles.css`
+- `src/styles/index.css`
+- `src/styles/tokens.css`
 - `src/FirstRunCheck.tsx`
-- `src/acceptance.css`
 
 ## Verified Context
 
@@ -37,7 +38,8 @@ The target is not a large "professional-looking" dashboard. The interface should
 4. preserve keyboard discoverability and visible focus states;
 5. keep First-run Check and existing explicit destructive/action confirmations understandable after compaction;
 6. ensure all visible product UI strings are English;
-7. keep desktop layout polished and provide a reasonable narrow-width fallback without designing a separate mobile product.
+7. keep desktop layout polished and provide a reasonable narrow-width fallback without designing a separate mobile product;
+8. leave the frontend with one explicit style ownership model rather than permanent task/fix override layers.
 
 Use the repository/current Mira visual source if a canonical primary color is already available at implementation time. Do not guess a new brand color when a real token/source can be read.
 
@@ -49,7 +51,7 @@ The first pass used too much orange; the subsequent restraint pass then over-cor
 - Human and AI conversation turns must be visually distinguishable at a glance without relying only on `USER` / `ASSISTANT` labels. Do not render both roles with the same orange treatment.
 - Keep ordinary structural chrome — separators, passive borders, inactive controls and large panel surfaces — mostly neutral so the accent keeps meaning.
 - Restore useful VS Code-like technical color variation instead of aliasing every accent-like role to orange. Blue/cyan may represent informational/tool activity; yellow may represent thinking/running/warning; green success; red failure/destructive states; other technical hues may remain where they improve scanning.
-- In particular, `--cyan` should be a real independent technical color rather than an alias of `--mira-accent` if the UI uses it for tool/information semantics.
+- In particular, informational/tool cyan must remain independent from Mira orange.
 - Orange should feel like the primary identity color, not the only color in the product.
 - Prefer role/state semantics over decorative color. Avoid orange text + orange border + orange background on ordinary controls.
 - Main Thread collapse control uses `−` when expanded and `+` when collapsed.
@@ -58,7 +60,7 @@ The intended result is a compact engineering workbench with a visible Mira orang
 
 ## Main Thread Rail Interaction
 
-Visual smoke also exposed a strong false affordance: the fixed vertical divider beside the Main Thread rail looks draggable, but the rail currently has no resize behavior. Because conversation width is a real working preference rather than decoration, implement actual horizontal resizing instead of merely trying to make the divider look less draggable.
+Visual smoke also exposed a strong false affordance: the fixed vertical divider beside the Main Thread rail looked draggable before the rail had resize behavior. Because conversation width is a real working preference rather than decoration, the divider is a real horizontal resize handle on desktop.
 
 - The divider between the control surface and Main Thread rail acts as a resize handle on desktop layouts where the rail is on the right.
 - Dragging changes the Main Thread rail width continuously without breaking text selection, keyboard focus or active thread state.
@@ -70,16 +72,29 @@ Visual smoke also exposed a strong false affordance: the fixed vertical divider 
 
 ## Top Alignment Follow-up
 
-The first desktop screen currently reads as three loosely stacked panes because the left workspace summary, central project header and Main Thread header do not share a consistent top rhythm.
+The first desktop screen initially read as three loosely stacked panes because the left workspace summary, central project header and Main Thread header did not share a consistent top rhythm.
 
-- Align the left workspace section, central project-status section and right Main Thread header to a shared visual top baseline where the desktop three-pane layout is active.
-- `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD` should follow compatible section-label typography, top padding and vertical rhythm even though their content differs.
+- Align the left workspace section, central project-status section and right Main Thread header to a coherent desktop rhythm.
+- `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD` should follow compatible section-label typography and spacing even though their content differs.
 - The current workspace/project summary block and central project header should not appear vertically offset by unrelated padding rules.
-- Prefer shared spacing/header tokens or deliberate equal-height top regions over one-off pixel nudges.
+- Prefer shared spacing/header tokens or deliberate layout rules over one-off pixel nudges.
 - Preserve compact density; alignment must not be achieved by simply making every header taller.
 - Narrow responsive layouts may diverge once panes stack, but should still avoid obvious accidental offsets within each stacked region.
 
 The intended result is one coherent engineering workbench rather than three panels that happen to sit beside each other.
+
+## Frontend Maintainability Contract
+
+T017 also owns the cleanup required to keep the accepted visual direction maintainable before T018 adds more runtime UI.
+
+- `docs/frontend-style-contract.md` is the frontend visual/style source of truth.
+- `src/styles/index.css` is the only application-root style entrypoint.
+- Canonical ownership is `tokens.css`, `base.css`, `shell.css`, `workbench.css`, `main-thread.css`, and `overlays.css`.
+- Task/history layers such as `t016-builder-ui.css` and `visual-restraint.css` must not survive as permanent override strata.
+- Component-local styles must not duplicate rules already owned by the canonical style tree.
+- New visual work edits the owning selector; it must not create a later stylesheet merely to win by cascade order.
+- Reusable colors and other visual primitives are semantic tokens. New code should prefer canonical `--color-*`, `--surface-*`, `--text-*`, and `--border-*` variables over compatibility aliases or repeated literals.
+- T018 must build on this ownership model rather than adding `T018-*.css`, `*-fix.css`, or equivalent patch layers.
 
 ## Hard Constraints
 
@@ -91,17 +106,22 @@ The intended result is one coherent engineering workbench rather than three pane
 - Do not introduce mixed Chinese/English product copy; visible UI is English-only.
 - Do not remove the Mira primary color entirely or collapse technical semantic colors into one accent.
 - Do not implement rail resizing through runtime/project persistence APIs; keep it as local UI preference state.
+- Do not add task-named/fix/override stylesheets or duplicate an owned selector in a second stylesheet to force cascade precedence.
 
 ## Execution Entry Points
 
 - `src/App.tsx`
-- `src/styles.css`
 - `src/main.tsx`
 - `src/MainThreadPanel.tsx`
-- `src/main-thread.css`
 - `src/FirstRunCheck.tsx`
-- `src/acceptance.css`
-- focused new UI components/styles created by T015
+- `src/styles/index.css`
+- `src/styles/tokens.css`
+- `src/styles/base.css`
+- `src/styles/shell.css`
+- `src/styles/workbench.css`
+- `src/styles/main-thread.css`
+- `src/styles/overlays.css`
+- `docs/frontend-style-contract.md`
 
 ## Acceptance
 
@@ -114,7 +134,7 @@ The intended result is one coherent engineering workbench rather than three pane
 - Rail resizing has sensible bounds, keeps the rest of the workspace usable, and does not reset selection, focus, draft text or active thread state.
 - A chosen desktop rail width is restored after refresh where local UI persistence is available.
 - Narrow layouts do not expose a misleading horizontal resize affordance after the Main Thread rail moves below the main surface.
-- On the desktop three-pane layout, the left workspace summary, central project header and Main Thread header share a coherent top baseline and vertical rhythm rather than appearing independently offset.
+- On the desktop workbench, project navigation, project status and Main Thread read as one coherent surface rather than independently offset panels.
 - Major page regions are visibly denser than the original implementation: less padding, smaller controls/headings and fewer oversized card surfaces.
 - Main thread, project/task/thread navigation and runtime information can coexist on a normal laptop viewport without unnecessary scrolling caused by decorative spacing.
 - Runtime event bursts do not expand the Event Log until it dominates the workbench or visually collapse an active task row.
@@ -122,7 +142,9 @@ The intended result is one coherent engineering workbench rather than three pane
 - Keyboard navigation/focus remains usable and visible.
 - First-run Check, dispatch and cancel interactions remain understandable and do not regress behavior.
 - No major layout jumping is introduced by polling/state changes.
-- `npm run typecheck`, `npm run build` and existing smoke verification remain green.
+- The application loads one canonical style entrypoint; task/fix override stylesheets are absent from `src`.
+- Frontend selector ownership and token/breakpoint rules are documented and referenced from `AGENTS.md`.
+- `npm test`, `npm run typecheck`, `npm run build` and existing smoke verification remain green.
 
 ## Delivery Evidence
 
@@ -138,14 +160,16 @@ The intended result is one coherent engineering workbench rather than three pane
 - Human browser visual smoke initially accepted the restrained accent pass on 2026-08-31.
 - Later visual review on 2026-09-01 superseded that acceptance: the restraint pass was judged too color-sparse, human/AI conversation role separation needs stronger visual distinction, Mira orange should remain a visible primary color, and VS Code-like technical colors should be retained where semantically useful.
 - The same visual review identified the fixed Main Thread divider as a false resize affordance; T017 now requires a real bounded desktop drag-resize interaction with local UI preference persistence.
-- Follow-up visual review also identified misaligned top-region rhythm across `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD`; T017 now requires a shared desktop top baseline/spacing rhythm rather than independent pane offsets.
+- Follow-up visual review also identified misaligned top-region rhythm across `WORKSPACES`, `PROJECT STATUS` and `MAIN THREAD`; T017 now requires a coherent desktop alignment/rhythm rather than independent pane offsets.
 - Rework pass merged to `dev` through PR `#14` at squash commit `71db8a3b4e8f397dbb327209eee12a907574fcdd`.
 - PR `#14` implements blue/cyan/yellow/violet technical role/state cues, distinct blue human vs orange assistant turns, real bounded/persistent Main Thread drag resizing with keyboard support, and the shared desktop top rhythm.
 - PR `#14` Verify run `33500817912` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` on final head `ed8978b7b4efd3c8b03089b850522d1c0bf40562`.
 - Human dispatch-start smoke on 2026-09-01 exposed a runtime-burst UI regression: repeated `dispatch.provider_event` rows dominated the Event Log and the active task row appeared visually compressed.
 - Runtime-burst hardening merged to `dev` through PR `#16` at squash commit `5e398bcc0debcf3cdac853240a296b32ecef44a2`; it bounds the Event Log, keeps its header sticky, shows only the newest low-level provider pulse while preserving lifecycle rows, and hardens active task-row sizing.
 - PR `#16` Verify run `33503825474` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
-- T017 remains `REVIEW` until the dispatch-start visual regression and the broader merged rework are visually accepted in the browser.
+- Frontend maintainability cleanup is implemented in PR `#18`: the historical root/task/visual/component CSS layers are replaced by the canonical `src/styles/` ownership tree, semantic tokens are centralized, and `docs/frontend-style-contract.md` is bound from `AGENTS.md`.
+- PR `#18` Verify run `33582718853` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` before the task-card documentation update; the final PR head must re-run verification before merge.
+- T017 remains `REVIEW` until the structurally cleaned UI is visually smoked in the browser.
 
 ## Out of Scope
 
@@ -159,10 +183,12 @@ The intended result is one coherent engineering workbench rather than three pane
 
 Resolved: Mira orange remains the primary brand color, but it coexists with neutral structural chrome and semantic technical colors rather than replacing them.
 
-Resolved: the right Main Thread divider should become a real desktop resize handle rather than being visually disguised as non-interactive chrome.
+Resolved: the right Main Thread divider is a real desktop resize handle rather than visually disguised non-interactive chrome.
 
-Resolved: the three desktop top regions should align as one coherent workbench while preserving compact density.
+Resolved: the desktop top regions should align as one coherent workbench while preserving compact density.
+
+Resolved: frontend style ownership is formalized before T018; future task-specific visual changes must use the canonical style tree instead of permanent override files.
 
 ## Handoff
 
-T017 rework and the runtime-burst hardening are merged to `dev` with automated verification green. Repeat the short browser smoke, including starting a real Builder dispatch, and verify color balance, human/assistant distinction, rail resizing/persistence, top-region alignment, Event Log stability and active task-row readability. Keep the task in `REVIEW` until that human visual acceptance is complete.
+T017 UI implementation, runtime-burst hardening and frontend style-system cleanup are in review. Automated verification must be green on the final PR head, then repeat the short browser smoke including a real Builder dispatch. Verify color balance, human/assistant distinction, rail resizing/persistence, top-region rhythm, Event Log stability and active task-row readability. Keep T017 in `REVIEW` until that human visual acceptance is complete.

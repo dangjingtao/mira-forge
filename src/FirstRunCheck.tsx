@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from 'react'
-import './acceptance.css'
 
 type AcceptanceResult = {
   ok: boolean

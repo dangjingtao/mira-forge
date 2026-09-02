@@ -1,0 +1,86 @@
+:root {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #d9d3ce;
+  background: #0b0a09;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  /* Brand */
+  --color-accent: #fa7328;
+  --color-accent-hover: #e86a21;
+  --color-accent-soft: rgba(250, 115, 40, 0.09);
+  --color-assistant: var(--color-accent);
+  --color-assistant-soft: rgba(250, 115, 40, 0.055);
+
+  /* Technical semantics */
+  --color-info: #4ec9b0;
+  --color-user: #569cd6;
+  --color-user-soft: rgba(86, 156, 214, 0.08);
+  --color-artifact: #c586c0;
+  --color-warning: #d3a05a;
+  --color-success: #7fb96e;
+  --color-danger: #d87771;
+
+  /* Surfaces */
+  --surface-canvas: #0b0a09;
+  --surface-chrome: #0d0c0b;
+  --surface-sidebar: #0e0d0c;
+  --surface-raised: #100f0e;
+  --surface-panel: #141210;
+  --surface-panel-hover: #191613;
+  --surface-input: #0c0b0a;
+  --surface-modal: #13110f;
+  --surface-code: #090807;
+
+  /* Text and borders */
+  --text-primary: #d9d3ce;
+  --text-strong: #f6f1ed;
+  --text-muted: #8b827a;
+  --text-dim: #6a625c;
+  --text-faint: #625b55;
+  --border-default: #2a2622;
+  --border-strong: #3a332e;
+  --border-subtle: #211e1b;
+  --border-process: #26211e;
+
+  /* Shape and layout */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 7px;
+  --topbar-height: 34px;
+  --sidebar-width: 210px;
+  --content-gutter: 24px;
+  --rail-width-default: 370px;
+
+  /* Typography */
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* Effects */
+  --shadow-modal: 0 20px 64px rgba(0, 0, 0, 0.55);
+
+  /* Compatibility aliases while component code migrates. Do not introduce new uses. */
+  --mira-accent: var(--color-accent);
+  --mira-accent-hover: var(--color-accent-hover);
+  --mira-accent-soft: var(--color-accent-soft);
+  --bg: var(--surface-canvas);
+  --surface: var(--surface-raised);
+  --panel: var(--surface-panel);
+  --panel2: var(--surface-panel-hover);
+  --line: var(--border-default);
+  --line-strong: var(--border-strong);
+  --muted: var(--text-muted);
+  --text: var(--text-primary);
+  --bright: var(--text-strong);
+  --green: var(--color-success);
+  --cyan: var(--color-info);
+  --blue: var(--color-user);
+  --violet: var(--color-artifact);
+  --yellow: var(--color-warning);
+  --red: var(--color-danger);
+  --user-accent: var(--color-user);
+  --user-accent-soft: var(--color-user-soft);
+  --assistant-accent: var(--color-assistant);
+  --assistant-accent-soft: var(--color-assistant-soft);
+  --mono: var(--font-mono);
+}
