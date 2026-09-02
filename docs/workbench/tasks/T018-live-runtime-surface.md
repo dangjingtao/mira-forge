@@ -91,18 +91,25 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 
 ## Delivery Evidence
 
-- Implementation merged to `dev` through PR `#24` at squash commit `fa385d031e038d1d600cce532a14a53c2e0547ed`.
+- Initial implementation merged to `dev` through PR `#24` at squash commit `fa385d031e038d1d600cce532a14a53c2e0547ed`.
+- Self-acceptance on 2026-09-02 found four implementation gaps in the merged tree rather than treating the initial green CI as sufficient acceptance: Builder result events were not injected into the next Main Thread provider turn, a result arriving during an active Main Thread turn could be folded into the collapsible process section, `starting` sessions could display creation time as a false start duration, and historical attention could remain actionable or be truncated after later authoritative resolution.
+- Self-acceptance fixes merged through PR `#25` at squash commit `7f2ae600b8c9b4caa5ef8b2038714d413b422f4e`.
 - Builder dispatches may explicitly bind a `sourceThreadId` only when the selected Main Thread belongs to the same project. Blank/default dispatch remains independent and receives no Main Thread conversation history.
 - Terminal Builder states (`completed`, `failed`, `cancelled`, restart/shutdown interruption) write one durable `builder_result` handoff to the explicitly related Main Thread with authoritative project/batch/task/dispatch/session identity, provider/session metadata, terminal task state, bounded `resultText` and error evidence where available.
 - Handoff append is idempotent by related Main Thread plus dispatch identity, so polling or restart reconstruction cannot append the same child result repeatedly.
+- The next Main Thread user turn receives Builder result handoffs that arrived since the previous user turn as bounded Forge context. This makes the Main Thread model itself able to reason from the child result while explicitly treating dispatch/session/task state as authoritative and without injecting Builder conversation history. The same result is not re-injected on every later user turn.
+- `builder_result` events remain standalone in the Main Thread timeline even if they arrive while another Main Thread turn is running, so the child-task result is not hidden inside the turn's folded thinking/execution process.
 - Successful Builder completion still moves the task only to `reviewing`; the Main Thread result card displays dispatch state and task state separately and never promotes process success to Review PASS.
-- The workbench now composes a dedicated `LiveRuntimeSurface` before the existing Batch/Event Log surfaces. It projects persisted Main Threads, Builder/Reviewer sessions, blocked dependency states and review-needed states without manufacturing progress.
-- Runtime rows expose provider/task/session status and factual started/duration information. Builder rows linked to a Main Thread provide an explicit focus entry point, while row selection preserves the existing task selection path and can reveal durable session/result/error detail.
+- The workbench composes a dedicated `LiveRuntimeSurface` before the existing Batch/Event Log surfaces. It projects persisted Main Threads, Builder/Reviewer sessions, blocked dependency states and review-needed states without manufacturing progress.
+- Runtime rows expose provider/task/session status and only use authoritative `session.startedAt` for elapsed duration. A session that has not actually started does not manufacture elapsed execution time from `createdAt`.
+- Historical failed/review attempts stop counting as actionable attention after current task truth moves beyond the unresolved state; unresolved active/attention rows are not discarded by the passive 16-row history cap. The visible surface remains height-bounded by its scrolling container.
+- Builder rows linked to a Main Thread provide an explicit focus entry point, while row selection preserves the existing task selection path and can reveal durable session/result/error detail.
 - Main Thread renders terminal Builder handoffs as readable result cards while preserving the original T015 reference-only handoff shape.
 - Existing two-second `/api/state` polling remains the runtime transport; no SSE/WebSocket, new permissions, auto-merge or conversation-context injection was introduced.
-- Automated regression coverage includes state-to-live-UI mapping, duration semantics, project isolation, result-handoff identity/idempotency, cross-project binding rejection, terminal completion correlation and restart interruption handoff.
-- PR `#24` final Verify run `33597035459` passed `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke` on final PR head `9c5aa1fe506c5dd2fcb6b2166ac5ab264115a86c`.
-- Final acceptance remains intentionally in `REVIEW` until one real Builder dispatch is observed through the product UI/runtime and confirms the live row plus terminal Main Thread result handoff on the actual local provider path. This is the only remaining task-card acceptance item not reproducible by repository automation in the current execution environment.
+- Automated regression coverage includes state-to-live-UI mapping, duration semantics, project isolation, result-handoff identity/idempotency, cross-project binding rejection, terminal completion correlation, restart interruption handoff, provider-context result delivery-once, late-result delivery, resolved attention, unresolved-attention retention and stable polling row identity.
+- PR `#24` final Verify run `33597035459` passed `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke`.
+- PR `#25` Verify run `33611537231` passed the same four gates, and merged-tree Verify run `33611610144` passed them again on `dev`.
+- Final acceptance remains intentionally in `REVIEW` until one real Builder dispatch is observed through the product UI/runtime and confirms the live row, truthful timing, terminal Main Thread result handoff and next-turn Main Thread continuation on the actual local provider path. This is the only remaining task-card acceptance item not reproducible by repository automation in the current execution environment.
 
 ## Out of Scope
 
