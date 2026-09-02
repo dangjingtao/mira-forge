@@ -1,22 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 
-const feedbackStyle = {
-  position: 'fixed' as const,
-  left: '50%',
-  bottom: 12,
-  zIndex: 19,
-  padding: '6px 9px',
-  border: '1px solid rgba(250, 115, 40, .28)',
-  borderRadius: 4,
-  background: '#151210',
-  color: '#fa7328',
-  fontFamily: '"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace',
-  fontSize: 9,
-  letterSpacing: '.03em',
-  pointerEvents: 'none' as const,
-  transform: 'translateX(-50%)',
-}
-
 function ShortcutFeedback() {
   const [message, setMessage] = useState('')
   const timerRef = useRef<number | null>(null)
@@ -62,7 +45,7 @@ function ShortcutFeedback() {
   }, [])
 
   if (!message) return null
-  return <div role="status" aria-live="polite" style={feedbackStyle}>{message}</div>
+  return <div className="shortcut-feedback" role="status" aria-live="polite">{message}</div>
 }
 
 export default ShortcutFeedback

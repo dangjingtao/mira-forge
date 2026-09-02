@@ -444,6 +444,22 @@
   word-break: break-word;
 }
 
+.shortcut-feedback {
+  position: fixed;
+  z-index: 19;
+  left: 50%;
+  bottom: 12px;
+  padding: 6px 9px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(250, 115, 40, .28);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--color-accent);
+  font: 9px/1.35 var(--font-mono);
+  letter-spacing: .03em;
+  pointer-events: none;
+}
+
 @media (max-width: 760px) {
   .form-pair,
   .acceptance-result dl {
