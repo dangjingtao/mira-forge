@@ -1,5 +1,6 @@
+import BatchList from './BatchList'
+import RuntimeEventLog from './RuntimeEventLog'
 import type { Batch, Dispatch, Project, RuntimeEvent, WorkbenchStats } from './model'
-import { activeDispatchStatuses, formatEventData, formatTime, statusLabels, taskKey } from './model'
 
 type RuntimePaneProps = {
   selected?: Project
@@ -72,63 +73,14 @@ export default function RuntimePane({
             </div>
           </div>
 
-          {batches.length ? batches.map((batch) => (
-            <article className="batch" key={batch.id}>
-              <div className="batch-head"><strong>{batch.name}</strong><span>{batch.status}</span></div>
-              {batch.tasks.map((task) => {
-                const key = taskKey(batch.id, task.id)
-                const taskDispatch = dispatches.find(
-                  (dispatch) => dispatch.batchId === batch.id
-                    && dispatch.taskId === task.id
-                    && activeDispatchStatuses.has(dispatch.status),
-                )
-                return (
-                  <button
-                    type="button"
-                    className={`task task-button ${key === selectedTaskKey ? 'selected-task' : ''}`}
-                    key={task.id}
-                    aria-pressed={key === selectedTaskKey}
-                    onClick={() => onSelectTask(key)}
-                    onFocus={() => onSelectTask(key)}
-                  >
-                    <span className={`status-dot dot-${task.status}`} />
-                    <b>{task.id}</b>
-                    <span className="task-title">{task.title}</span>
-                    <span className="task-meta">
-                      {taskDispatch ? `${taskDispatch.adapterId} · ${taskDispatch.status}` : task.builder || 'unassigned'}
-                      {task.reviewRound ? ` · review #${task.reviewRound}` : ''}
-                    </span>
-                    <span className={`task-status status-${task.status}`}>{statusLabels[task.status] || task.status}</span>
-                  </button>
-                )
-              })}
-            </article>
-          )) : (
-            <div className="empty-stream">
-              <span className="prompt">›</span>
-              <div>
-                <strong>no batches to dispatch</strong>
-                <p>Create a Batch from repository Task Cards. Forge keeps the cards in the repository as the source of truth.</p>
-                <button className="empty-action" type="button" onClick={onNewBatch}>
-                  create batch from repo tasks <kbd>b</kbd>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {selectedEvents.length > 0 && (
-            <div className="event-log" aria-label="runtime events">
-              <div className="event-log-title">EVENT LOG <span>latest {Math.min(selectedEvents.length, 30)}</span></div>
-              {[...selectedEvents].slice(-30).reverse().map((event) => (
-                <div className={`runtime-event event-${event.type.split('.').at(-1)}`} key={event.id}>
-                  <time>{formatTime(event.createdAt)}</time>
-                  <span className="event-task">{event.taskId ?? '—'}</span>
-                  <strong>{event.type}</strong>
-                  <span className="event-detail">{formatEventData(event)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <BatchList
+            batches={batches}
+            dispatches={dispatches}
+            selectedTaskKey={selectedTaskKey}
+            onSelectTask={onSelectTask}
+            onNewBatch={onNewBatch}
+          />
+          <RuntimeEventLog events={selectedEvents} />
         </>
       ) : (
         <div className="empty-workspace">
