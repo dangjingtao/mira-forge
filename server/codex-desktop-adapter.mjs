@@ -55,6 +55,26 @@ function createProgressPublisher(onEvent) {
   }
 }
 
+function writerConflictError(error, threadId) {
+  const message = error instanceof Error ? error.message : String(error)
+  if (!/already has an active writer/i.test(message)) return error instanceof Error ? error : new Error(message)
+  const id = optionalString(threadId)
+  return new Error(
+    `Codex Desktop thread${id ? ` ${id}` : ''} is owned by another app-server writer. `
+    + 'Close the other Codex/ChatGPT writer or open a new Forge Main Thread, then retry.',
+  )
+}
+
+function turnTimeout(timeoutMs) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return null
+  let timer
+  const promise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Codex Desktop app-server timed out after ${timeoutMs}ms`)), timeoutMs)
+    timer.unref?.()
+  })
+  return { promise, cancel: () => clearTimeout(timer) }
+}
+
 export function codexDesktopBinaryCandidates(home = homedir()) {
   return [
     '/Applications/ChatGPT.app/Contents/Resources/codex',
@@ -215,7 +235,7 @@ function parseJsonLine(line) {
   }
 }
 
-function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImpl, onNotification }) {
+function createAppServerProcess({ bin, prefixArgs, cwd, env, spawnImpl }) {
   const child = spawnImpl(bin, [...prefixArgs, 'app-server', '--listen', 'stdio://'], {
     cwd,
     env,
@@ -227,7 +247,7 @@ function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImp
   let nextId = 1
   let closed = false
   let closeInfo = null
-  let timer = null
+  let notificationHandler = null
   const pending = new Map()
   let closeResolve
   const closePromise = new Promise((resolve) => { closeResolve = resolve })
@@ -271,7 +291,7 @@ function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImp
       return
     }
 
-    if (message.method) onNotification(message)
+    if (message.method && typeof notificationHandler === 'function') notificationHandler(message)
   }
 
   const consumeLine = (line) => {
@@ -292,7 +312,6 @@ function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImp
   child.once('error', (error) => {
     if (closed) return
     closed = true
-    if (timer) clearTimeout(timer)
     rejectPending(error)
     closeInfo = { code: null, signal: null, stderr: stderr.trim(), error }
     closeResolve(closeInfo)
@@ -302,7 +321,6 @@ function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImp
     stdoutBuffer = ''
     if (closed) return
     closed = true
-    if (timer) clearTimeout(timer)
     const error = code === 0
       ? new Error('Codex Desktop app-server closed')
       : new Error(stderr.trim() || `Codex Desktop app-server exited with code ${code ?? 'unknown'}`)
@@ -315,16 +333,6 @@ function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImp
     }
     closeResolve(closeInfo)
   })
-
-  if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
-    timer = setTimeout(() => {
-      if (closed) return
-      try { child.kill('SIGTERM') } catch { /* close path handles it */ }
-      const error = new Error(`Codex Desktop app-server timed out after ${timeoutMs}ms`)
-      rejectPending(error)
-    }, timeoutMs)
-    timer.unref?.()
-  }
 
   return {
     request(method, params) {
@@ -342,7 +350,18 @@ function createAppServerProcess({ bin, prefixArgs, cwd, env, timeoutMs, spawnImp
     notify(method, params) {
       send({ method, ...(params === undefined ? {} : { params }) })
     },
+    setNotificationHandler(handler) {
+      notificationHandler = typeof handler === 'function' ? handler : null
+    },
+    isClosed() {
+      return closed
+    },
+    forceClose() {
+      if (closed) return
+      try { child.kill('SIGTERM') } catch { /* ignore */ }
+    },
     async close() {
+      notificationHandler = null
       if (!closed && child.stdin?.writable) child.stdin.end()
       const grace = new Promise((resolve) => setTimeout(resolve, 1200))
       await Promise.race([closePromise, grace])
@@ -364,12 +383,98 @@ export function createCodexDesktopMainThreadAdapter({
   timeoutMs = 300_000,
   resolveBin = resolveCodexDesktopBinary,
 } = {}) {
+  const owners = new Map()
+  let disposed = false
+
+  const forgetOwner = (owner) => {
+    if (owners.get(owner.threadId)?.client === owner.client) owners.delete(owner.threadId)
+  }
+
+  const releaseOwner = async (owner) => {
+    forgetOwner(owner)
+    if (!owner.client.isClosed()) {
+      try {
+        await owner.client.request('thread/unsubscribe', { threadId: owner.threadId })
+      } catch {
+        // Closing the app-server process is the authoritative writer release.
+      }
+    }
+    await owner.client.close().catch(() => undefined)
+  }
+
+  const openOwner = async ({ projectRoot, externalThreadId, model }) => {
+    const resolvedBin = await resolveBin({ bin })
+    const client = createAppServerProcess({
+      bin: resolvedBin,
+      prefixArgs,
+      cwd: projectRoot,
+      env: environment,
+      spawnImpl,
+    })
+
+    try {
+      await client.request('initialize', {
+        clientInfo: {
+          name: 'mira_forge',
+          title: 'Mira Forge',
+          version: '0.1.0',
+        },
+        capabilities: { experimentalApi: false },
+      })
+      client.notify('initialized')
+
+      const openRequest = buildCodexDesktopThreadRequest({ projectRoot, externalThreadId, model })
+      let openResult
+      try {
+        openResult = await client.request(openRequest.method, openRequest.params)
+      } catch (error) {
+        throw writerConflictError(error, externalThreadId)
+      }
+      const threadId = optionalString(openResult?.thread?.id)
+      if (!threadId) throw new Error('Codex Desktop app-server did not return a durable thread ID')
+      if (externalThreadId && threadId !== externalThreadId) throw new Error('Codex Desktop resumed a different thread')
+
+      const owner = { threadId, projectRoot, client, busy: false }
+      owners.set(threadId, owner)
+      client.closePromise.then(() => forgetOwner(owner)).catch(() => forgetOwner(owner))
+      return owner
+    } catch (error) {
+      await client.close().catch(() => undefined)
+      throw error
+    }
+  }
+
+  const getOwner = async ({ projectRoot, externalThreadId, model }) => {
+    const threadId = optionalString(externalThreadId)
+    if (threadId) {
+      const existing = owners.get(threadId)
+      if (existing && !existing.client.isClosed()) {
+        if (existing.projectRoot !== projectRoot) throw new Error('Codex Desktop thread is bound to a different project root')
+        return existing
+      }
+    }
+    return openOwner({ projectRoot, externalThreadId: threadId, model })
+  }
+
+  const forceCloseAll = () => {
+    for (const owner of owners.values()) owner.client.forceClose()
+  }
+  process.once('exit', forceCloseAll)
+
   return {
     id: 'codex-desktop',
     async runTurn(input) {
+      if (disposed) throw new Error('Codex Desktop adapter is shut down')
       const projectRoot = requiredString(input.projectRoot, 'projectRoot')
       const message = requiredString(input.message, 'message')
-      const resolvedBin = await resolveBin({ bin })
+      const owner = await getOwner({
+        projectRoot,
+        externalThreadId: input.externalThreadId,
+        model: input.model,
+      })
+      if (owner.busy) throw new Error(`Codex Desktop thread ${owner.threadId} already has an active Forge turn`)
+      owner.busy = true
+
       const events = []
       const progress = createProgressPublisher(input.onEvent)
       const reasoningDeltas = new Map()
@@ -377,7 +482,6 @@ export function createCodexDesktopMainThreadAdapter({
       let responseText = ''
       let providerError = null
       let writeAttemptObserved = false
-      let observedThreadId = null
       let targetTurnId = null
       let terminal = null
       let terminalResolve
@@ -389,94 +493,69 @@ export function createCodexDesktopMainThreadAdapter({
         progress.publish(normalized)
       }
 
-      const client = createAppServerProcess({
-        bin: resolvedBin,
-        prefixArgs,
-        cwd: projectRoot,
-        env: environment,
-        timeoutMs,
-        spawnImpl,
-        onNotification(notification) {
-          const method = optionalString(notification.method)
-          const params = notification.params && typeof notification.params === 'object' ? notification.params : {}
-          const item = params.item && typeof params.item === 'object' ? params.item : null
+      owner.client.setNotificationHandler((notification) => {
+        const method = optionalString(notification.method)
+        const params = notification.params && typeof notification.params === 'object' ? notification.params : {}
+        const item = params.item && typeof params.item === 'object' ? params.item : null
 
-          if (method === 'item/reasoning/summaryTextDelta' && optionalString(params.itemId) && typeof params.delta === 'string') {
-            const key = params.itemId.trim()
-            reasoningDeltas.set(key, appendBounded(reasoningDeltas.get(key) || '', params.delta, 16_384))
-          }
-          if (method === 'item/reasoning/textDelta' && optionalString(params.itemId) && typeof params.delta === 'string') {
-            const key = params.itemId.trim()
-            reasoningDeltas.set(key, appendBounded(reasoningDeltas.get(key) || '', params.delta, 16_384))
-          }
-          if (method === 'item/agentMessage/delta' && optionalString(params.itemId) && typeof params.delta === 'string') {
-            const key = params.itemId.trim()
-            agentDeltas.set(key, appendBounded(agentDeltas.get(key) || '', params.delta))
-          }
-
-          if (item?.type === 'fileChange') writeAttemptObserved = true
-          if (method === 'item/completed' && item?.type === 'agentMessage' && typeof item.text === 'string' && item.text.trim()) {
-            responseText = appendBounded(responseText, `${item.text.trim()}\n`)
-          }
-
-          const fallback = item?.id ? reasoningDeltas.get(String(item.id)) : null
-          publishNormalized(normalizeCodexDesktopNotification(notification, fallback))
-
-          if (method === 'error') {
-            const messageText = params.error?.message || params.message
-            if (typeof messageText === 'string' && messageText.trim()) providerError = messageText.trim()
-          }
-
-          if (method === 'turn/completed') {
-            const threadId = optionalString(params.threadId)
-            const turn = params.turn && typeof params.turn === 'object' ? params.turn : null
-            const turnId = optionalString(turn?.id) || optionalString(params.turnId)
-            if ((!observedThreadId || !threadId || threadId === observedThreadId)
-              && (!targetTurnId || !turnId || turnId === targetTurnId)) {
-              terminal = notification
-              terminalResolve(notification)
-            }
-          }
-        },
-      })
-
-      try {
-        await client.request('initialize', {
-          clientInfo: {
-            name: 'mira_forge',
-            title: 'Mira Forge',
-            version: '0.1.0',
-          },
-          capabilities: { experimentalApi: false },
-        })
-        client.notify('initialized')
-
-        const openRequest = buildCodexDesktopThreadRequest({
-          projectRoot,
-          externalThreadId: input.externalThreadId,
-          model: input.model,
-        })
-        const openResult = await client.request(openRequest.method, openRequest.params)
-        observedThreadId = optionalString(openResult?.thread?.id)
-        if (!observedThreadId) throw new Error('Codex Desktop app-server did not return a durable thread ID')
-        if (input.externalThreadId && observedThreadId !== input.externalThreadId) {
-          throw new Error('Codex Desktop resumed a different thread')
+        if (method === 'item/reasoning/summaryTextDelta' && optionalString(params.itemId) && typeof params.delta === 'string') {
+          const key = params.itemId.trim()
+          reasoningDeltas.set(key, appendBounded(reasoningDeltas.get(key) || '', params.delta, 16_384))
+        }
+        if (method === 'item/reasoning/textDelta' && optionalString(params.itemId) && typeof params.delta === 'string') {
+          const key = params.itemId.trim()
+          reasoningDeltas.set(key, appendBounded(reasoningDeltas.get(key) || '', params.delta, 16_384))
+        }
+        if (method === 'item/agentMessage/delta' && optionalString(params.itemId) && typeof params.delta === 'string') {
+          const key = params.itemId.trim()
+          agentDeltas.set(key, appendBounded(agentDeltas.get(key) || '', params.delta))
         }
 
-        const turnResult = await client.request('turn/start', buildCodexDesktopTurnRequest({
+        if (item?.type === 'fileChange') writeAttemptObserved = true
+        if (method === 'item/completed' && item?.type === 'agentMessage' && typeof item.text === 'string' && item.text.trim()) {
+          responseText = appendBounded(responseText, `${item.text.trim()}\n`)
+        }
+
+        const fallback = item?.id ? reasoningDeltas.get(String(item.id)) : null
+        publishNormalized(normalizeCodexDesktopNotification(notification, fallback))
+
+        if (method === 'error') {
+          const messageText = params.error?.message || params.message
+          if (typeof messageText === 'string' && messageText.trim()) providerError = messageText.trim()
+        }
+
+        if (method === 'turn/completed') {
+          const threadId = optionalString(params.threadId)
+          const turn = params.turn && typeof params.turn === 'object' ? params.turn : null
+          const turnId = optionalString(turn?.id) || optionalString(params.turnId)
+          if ((!threadId || threadId === owner.threadId) && (!targetTurnId || !turnId || turnId === targetTurnId)) {
+            terminal = notification
+            terminalResolve(notification)
+          }
+        }
+      })
+
+      const timeout = turnTimeout(timeoutMs)
+      try {
+        const turnResult = await owner.client.request('turn/start', buildCodexDesktopTurnRequest({
           projectRoot,
-          threadId: observedThreadId,
+          threadId: owner.threadId,
           message,
           model: input.model,
         }))
         targetTurnId = optionalString(turnResult?.turn?.id)
         if (!targetTurnId) throw new Error('Codex Desktop app-server did not return a turn ID')
-        if (!terminal) await Promise.race([
-          terminalPromise,
-          client.closePromise.then((info) => {
-            throw new Error(info?.stderr || 'Codex Desktop app-server closed before the turn completed')
-          }),
-        ])
+
+        if (!terminal) {
+          const waits = [
+            terminalPromise,
+            owner.client.closePromise.then((info) => {
+              throw new Error(info?.stderr || 'Codex Desktop app-server closed before the turn completed')
+            }),
+          ]
+          if (timeout) waits.push(timeout.promise)
+          await Promise.race(waits)
+        }
 
         await progress.flush()
         const terminalTurn = terminal?.params?.turn
@@ -494,21 +573,28 @@ export function createCodexDesktopMainThreadAdapter({
         }
         if (!responseText.trim()) throw new Error(providerError || 'Codex Desktop returned no assistant message')
 
-        try {
-          await client.request('thread/unsubscribe', { threadId: observedThreadId })
-        } catch {
-          // A completed turn is authoritative; cleanup failure must not erase it.
-        }
-
         return {
-          externalThreadId: observedThreadId,
+          externalThreadId: owner.threadId,
           responseText: responseText.trim(),
           events: progress.streamed() ? [] : events,
           providerEventType: 'codex-desktop.turn.completed',
         }
+      } catch (error) {
+        await releaseOwner(owner)
+        throw writerConflictError(error, owner.threadId)
       } finally {
-        await client.close().catch(() => undefined)
+        timeout?.cancel()
+        owner.busy = false
+        owner.client.setNotificationHandler(null)
       }
+    },
+    async dispose() {
+      if (disposed) return
+      disposed = true
+      process.removeListener('exit', forceCloseAll)
+      const active = [...owners.values()]
+      owners.clear()
+      await Promise.allSettled(active.map((owner) => releaseOwner(owner)))
     },
   }
 }
