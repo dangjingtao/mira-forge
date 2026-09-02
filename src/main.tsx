@@ -4,9 +4,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import MainThreadPanel from './MainThreadPanel'
 import ShortcutFeedback from './ShortcutFeedback'
-import './styles.css'
-import './t016-builder-ui.css'
-import './visual-restraint.css'
+import './styles/index.css'
 
 const RAIL_WIDTH_KEY = 'mira-forge:main-thread-width'
 const DEFAULT_RAIL_WIDTH = 370
