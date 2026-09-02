@@ -1,6 +1,6 @@
 # T016 — Builder Thread Adapters for OpenCode, PiAgent and Codex
 
-Status: REVIEW
+Status: PASS
 
 Depends on: T015 PASS.
 
@@ -28,6 +28,7 @@ Extend Forge's construction thread so one Builder contract can launch and superv
 - T015 established that Codex Desktop and standalone Codex CLI are distinct transports. T016 therefore does not force a separate CLI installation when the installed Desktop product already contains a usable Codex backend.
 - The 2026-09-01 T015 regression invalidated earlier selected-project task-source evidence because the `mira-mobile` project name was bound to the wrong local root. A successful provider run is therefore not valid product-loop evidence unless the selected project root, task source and resolved Task Card are all verified to belong to the intended repository.
 - Main-thread and Batch task-source operations now share the same conventional default resolution through `withTaskSourceDefaults`; project-specific task-source paths still override those defaults.
+- The 2026-09-02 human smoke exposed an additional compatibility bug: Forge's Task Card reader accepted only canonical `# ID — Title` + `Status:` syntax while the established Mobile cards use forms such as `# MOB-031：...` and `状态：**待实施**`. PR #15 added bounded read compatibility without changing canonical Forge writer output.
 
 ## Scope
 
@@ -53,6 +54,7 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - Do not rewrite the working OpenCode adapter merely for abstraction aesthetics; preserve its verified behavior.
 - Repository Task Cards remain the project truth; runtime Batch/Task state must not become a second Task Card source.
 - Human acceptance evidence MUST bind to the intended registered project root and an exact resolved repository Task Card. Evidence produced from a wrong project root or unrelated ledger is invalid even when the Builder process itself succeeds.
+- A human smoke may be read-only/check-oriented. Code modification is not itself an adapter acceptance requirement. If the selected smoke instruction permits writes, any writes must remain inside the exact verified working tree and task scope.
 
 ## Execution Entry Points
 
@@ -64,6 +66,7 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - `server/dispatch-domain.mjs`
 - `server/domain.mjs`
 - `server/project-task-actions.mjs`
+- `server/repo-task-source.mjs`
 - `src/App.tsx`
 - `src/t016-builder-ui.css`
 - `scripts/builder-adapter-smoke.mjs`
@@ -76,6 +79,7 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - `server/piagent-adapter.mjs` runs the installed `pi` executable in non-interactive JSON event mode with an ephemeral session. The Pi JSON session header supplies an observed provider session identity when present; tool lifecycle and terminal assistant text are normalized defensively. Malformed JSON lines are ignored.
 - `server/codex-builder-adapter.mjs` reuses the Codex backend bundled with the installed macOS ChatGPT/Codex Desktop application by default. It does not require a separately installed PATH CLI. Builder execution uses `codex exec --json` with a `workspace-write` sandbox and approval policy `never`; no danger/bypass flag is used. An explicit binary override remains available for other supported machine layouts.
 - `server/dispatch-manager.mjs` accepts `builder` or `preferredBuilder` in addition to the legacy `adapterId`, auto-registers the three built-in Builder descriptors, persists bounded normalized provider evidence, accepts provider-reported external session/thread identity, and treats provider-reported errors as failure even if the child process exits zero.
+- Builder adapters capture terminal assistant output as bounded `resultText`; `dispatch-manager` persists that result on the terminal dispatch record. Surfacing that durable result back into Main Thread is intentionally assigned to T018 rather than being treated as an adapter failure.
 - First-use serial safety is preserved globally across the three built-in choices. Adding PiAgent/Codex does not create simultaneous write lanes into an unmanaged working tree. Parallel Builders remain blocked until a scheduler/worktree contract explicitly replaces this guard.
 - Successful execution still moves the Task only to `reviewing`. Cancellation, restart reconciliation and shutdown remain owned by the existing Forge process-supervision path.
 - `/api/meta` exposes the product-level Builder choices and built-in adapter IDs.
@@ -84,6 +88,7 @@ Provider-specific event fields may remain optional. Do not force fake parity.
 - The UI global serial guard treats any active Builder dispatch as the occupied construction lane, independent of provider.
 - T016 UI additions follow the accepted T017 tokens: structural controls are neutral (`surface/panel/line/text`), semantic states retain semantic colors, and Mira orange is reserved for selection/focus/rare active emphasis.
 - After the T015 task-source regression fix, Batch and main-thread task-source paths both consume the same default-resolution helper. This removes one inconsistency, but it does not make an incorrectly registered `rootPath` safe; root identity must still be observed during human smoke.
+- PR #15 keeps canonical Forge Task Card creation/writes unchanged while making reads compatible with bounded legacy heading/status forms used by established repositories. Exact Task ID identity and unique Task Card resolution remain mandatory.
 
 ## Deterministic Verification
 
@@ -101,46 +106,53 @@ Repository tests cover:
 - cancellation/restart/shutdown supervision inherited from the existing manager;
 - repository task-source inspection and exact Task Card ref resolution;
 - validated task-source configuration before persistence;
-- repository Task selection → runtime Batch creation and duplicate active-task rejection.
+- repository Task selection → runtime Batch creation and duplicate active-task rejection;
+- Mobile-style legacy Task Card read compatibility plus explicit-update behavior without duplicate metadata lines.
 
 Verify #157 passed on PR #6 with `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`. PR #9 added the real product-loop UI/task-source path and was squash-merged to `dev` at `7d332b5a07e27c63502d6cc17e4c9e40026e36d6` after final PR-head Verify #181 passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke`.
 
-The 2026-09-01 T015 regression repair also passed 90 tests, typecheck and build, with focused coverage proving that main-thread and Batch-style task-source consumption share conventional defaults. This strengthens the shared task-source path but does not replace T016's real Builder product-loop smoke.
+The 2026-09-01 T015 regression repair also passed 90 tests, typecheck and build, with focused coverage proving that main-thread and Batch-style task-source consumption share conventional defaults. PR #15 then passed Verify #214 (`npm test`, typecheck, build and smoke) before merge, covering the real Mobile Task Card syntax discovered during T016 smoke.
 
 ## Human Product-loop Acceptance
 
-T016 is still not accepted. The previous OpenCode-only UI blocker is merged; the remaining acceptance fact is machine-local and must be observed by a human on the user's Mac.
+Accepted on 2026-09-02 by human Mac smoke, with the Builder-result-to-Main-Thread presentation gap explicitly handed to T018.
 
 ### Root / Task Source preflight
 
-Before dispatching, the human must verify all of the following in the real product flow:
+The real product flow verified:
 
-1. the selected Forge project is the intended project;
-2. the project root shown by Forge is the intended local checkout, not another repository with the same or similar task layout;
-3. `+ batch` loads the expected repository ledger/task IDs from that checkout;
-4. the chosen Task resolves to exactly one Task Card under the intended task directory;
-5. the smoke Task is a real, small Builder-ready Task Card with concrete `Goal` and `Acceptance` so task completion can be judged without inventing requirements.
+1. selected Forge project: `mira-mobile`;
+2. Forge showed the intended Mobile checkout root rather than the old wrong Forge root;
+3. `+ batch` loaded the canonical Mobile ledger with 34 `MOB-*` tasks;
+4. the selected smoke task resolved to exactly one Task Card: `docs/task-cards/MOB-031-shiyan-confirmation-hierarchy.md`;
+5. the Task Card contained concrete Goal/Acceptance content suitable for a real Builder invocation.
 
-If any of these facts are wrong or ambiguous, stop. A provider/session success from that run is not T016 acceptance evidence.
+The first dispatch attempt exposed the Task Card syntax compatibility bug described above. After PR #15 was merged and the local Forge server restarted, the same Batch/Task resolved successfully without rebuilding the Batch.
 
-### Required observed loop
+### Observed loop
 
-1. open Forge Web UI against the local control plane;
-2. complete the root/task-source preflight above;
-3. create a Batch from the verified repository Task Source using the Web UI;
-4. select the verified ready Task row;
-5. open Dispatch and choose `PiAgent` or `Codex` as Builder;
-6. dispatch from the UI without reconstructing internal IDs or calling the API manually;
-7. observe a real provider process/session identity and live normalized runtime events in Forge;
-8. verify the Builder actually performs the Task Card work inside the exact verified project root and does not write outside that working tree;
-9. verify terminal success moves the Forge runtime Task to `reviewing`, not `review_passed`, and does not silently mark the repository Task `PASS`;
-10. refresh/reopen Forge and confirm the durable dispatch/evidence remains visible and is still bound to the same project, Batch, Task and provider session/thread identity.
+1. Forge Web UI was opened against the local control plane.
+2. The root/task-source preflight above was completed.
+3. Batch `T16 smoke · MOB-031` was created from the verified repository Task Source using the Web UI.
+4. `MOB-031` was selected and its exact Task Card ref was shown in the Dispatch modal.
+5. `Codex` was selected as Builder; no manual API/internal-ID reconstruction was used.
+6. Forge launched a real Codex Builder process/session and bound a real external session identity.
+7. Forge accumulated live normalized provider/runtime evidence; the completed smoke retained 79 runtime events.
+8. The Builder invocation completed with `dispatch.completed`, process exit code `0`, and runtime Task state `reviewing` rather than `review_passed`.
+9. Browser refresh preserved the Batch, Task, external session/runtime evidence and `reviewing` state.
+10. Repository task truth was not silently promoted to `PASS` by the Builder exit.
 
-A failure in project binding, task-source identity, Task Card resolution, provider launch, path discovery, event normalization, task execution, workspace containment, state transition, or durable replay fails this human acceptance and keeps T016 in REVIEW.
+The smoke was accepted as an adapter/product-loop verification rather than as proof that the selected Mobile implementation task itself was functionally complete. A smoke may inspect/check a real task without requiring a code change; future smoke instructions should make read-only intent explicit when implementation is not desired.
+
+### Conditional follow-up moved to T018
+
+The Codex Builder adapter captures terminal assistant output and Forge persists it as dispatch `resultText`, but the current product surface does not yet return that child-task conclusion into Main Thread as a readable handoff. The operator should not need to infer a Builder's conclusion from raw Runtime Stream events.
+
+This is a runtime/control-surface integration concern, not evidence that the Builder adapter failed to execute or report. T018 now owns the contract: durable Builder final result → related Main Thread handoff, idempotent across refresh/restart and still bound to authoritative dispatch/task state.
 
 ## Narrow Real-machine Diagnostic
 
-These commands remain useful for isolating provider installation/adapter problems, but do not close T016 by themselves:
+These commands remain useful for isolating provider installation/adapter problems, but do not replace the completed product-loop evidence above:
 
 ```bash
 node scripts/builder-adapter-smoke.mjs piagent
@@ -166,7 +178,8 @@ MIRA_FORGE_CODEX_DESKTOP_BUILDER_BIN=/path/to/codex node scripts/builder-adapter
 - OpenCode regression tests remain green.
 - CI can exercise each adapter through deterministic fake runners or protocol fixtures.
 - The PiAgent/Codex real-machine diagnostic path is documented but is not counted as product-loop acceptance.
-- At least one PiAgent or Codex human product-loop dispatch has actually completed through Forge UI on the user's machine, modified only the intended project working tree, and reached durable runtime Task `reviewing` state after refresh.
+- At least one PiAgent or Codex human product-loop dispatch has actually completed through Forge UI on the user's machine, remained bound to the intended project/task context, and reached durable runtime Task `reviewing` state after refresh. A read-only/check-oriented smoke is valid; code modification is not required solely to prove adapter execution.
+- If a Builder performs writes during acceptance, those writes must stay within the intended working tree/task scope.
 - Builder success does not silently promote repository task truth to `PASS`.
 - `npm run check` remains green.
 
@@ -177,7 +190,8 @@ MIRA_FORGE_CODEX_DESKTOP_BUILDER_BIN=/path/to/codex node scripts/builder-adapter
 - Automatic Reviewer dispatch.
 - Parallel Builders/worktrees.
 - Provider account/model configuration UI beyond the minimal Builder selector needed to exercise this task.
+- Presenting Builder final `resultText` back into Main Thread; this is now explicit T018 scope.
 
 ## Handoff
 
-T016 remains REVIEW. The provider-neutral Builder implementation and Web product-loop entry points are merged. The 2026-09-01 T015 wrong-root regression showed that project-name/UI selection alone is insufficient evidence, so the remaining human smoke must first bind the selected project to the intended local checkout and exact Task Card, then complete one real PiAgent or Codex dispatch through Forge. Only that root-bound end-to-end observation may return T016 to PASS.
+T016 is PASS after the 2026-09-02 human Codex product-loop smoke. The adapter contract, provider launch/session identity, real Forge UI dispatch, root-bound Task Card resolution, normalized runtime evidence, terminal `reviewing` transition and refresh durability are all observed. T018 owns the remaining product seam discovered during smoke: return each durable Builder final result to the related Main Thread as a readable child-task handoff while keeping Runtime Stream as the execution/audit surface.
