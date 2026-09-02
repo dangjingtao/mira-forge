@@ -14,6 +14,11 @@
   font-size: 10px;
 }
 
+.main-thread-panel:focus {
+  outline: 1px solid var(--color-artifact);
+  outline-offset: -1px;
+}
+
 .main-thread-panel.collapsed {
   width: auto;
 }
@@ -308,6 +313,96 @@
 .main-thread-event.tone-running > span,
 .main-thread-event.tone-running p {
   color: var(--color-warning);
+}
+
+.main-thread-builder-result {
+  margin-top: 5px;
+  padding: 7px;
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--color-artifact);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-chrome);
+}
+
+.main-thread-builder-result-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.main-thread-builder-result-head strong {
+  margin-right: auto;
+  color: var(--text-strong);
+  font: 600 9px/1.3 var(--font-mono);
+}
+
+.builder-result-status {
+  padding: 2px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  font: 8px/1.2 var(--font-mono);
+}
+
+.builder-result-status.status-completed,
+.builder-result-status.status-review_passed,
+.builder-result-status.status-integrated {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.builder-result-status.status-running,
+.builder-result-status.status-starting,
+.builder-result-status.status-reviewing,
+.builder-result-status.status-building,
+.builder-result-status.status-fixing {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.builder-result-status.status-failed,
+.builder-result-status.status-cancelled,
+.builder-result-status.status-interrupted,
+.builder-result-status.status-stale {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.main-thread-builder-result pre {
+  max-height: 220px;
+  margin: 7px 0 0;
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-code);
+  color: var(--text-primary);
+  font: 9px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.main-thread-builder-result .builder-result-error {
+  margin-top: 7px;
+  color: var(--color-danger);
+  font: 9px/1.45 var(--font-mono);
+}
+
+.main-thread-builder-result-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 7px;
+  color: var(--text-dim);
+  font: 8px/1.3 var(--font-mono);
+}
+
+.main-thread-builder-result-refs code {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main-thread-process {
