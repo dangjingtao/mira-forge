@@ -70,7 +70,21 @@ export default function RuntimeInspectorModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          onClose()
+        } else if (event.key.toLowerCase() === 'e') {
+          event.preventDefault()
+          onOpenEvents()
+        }
+      }}
+    >
       <section className="runtime-inspector-modal" role="dialog" aria-modal="true" aria-labelledby="runtime-inspector-title">
         <header className="runtime-inspector-head">
           <div>
@@ -79,7 +93,7 @@ export default function RuntimeInspectorModal({
           </div>
           <div className="runtime-inspector-actions">
             <button type="button" onClick={onOpenEvents}><kbd>e</kbd> events</button>
-            <button type="button" onClick={onClose}><kbd>esc</kbd> close</button>
+            <button type="button" onClick={onClose} autoFocus={!rows.length}><kbd>esc</kbd> close</button>
           </div>
         </header>
 
