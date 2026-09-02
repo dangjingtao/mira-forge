@@ -1,0 +1,386 @@
+.forge-product-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--forge-thread-width, var(--rail-width-default));
+  overflow: hidden;
+  background: var(--surface-canvas);
+}
+
+.forge-product-shell:has(.main-thread-panel.collapsed) {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.forge-thread-rail {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+.forge-thread-resizer {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.forge-thread-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+}
+
+.forge-thread-resizer:hover::after,
+.forge-thread-resizer:focus-visible::after {
+  background: var(--color-accent);
+}
+
+.forge-thread-resizer:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.forge-thread-rail:has(.main-thread-panel.collapsed) .forge-thread-resizer {
+  display: none;
+}
+
+body.forge-resizing-thread,
+body.forge-resizing-thread * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.forge-tui {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-canvas);
+  font-size: 12px;
+}
+
+.topbar {
+  height: var(--topbar-height);
+  flex: 0 0 var(--topbar-height);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-chrome);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-strong);
+  font-weight: 700;
+  letter-spacing: .13em;
+}
+
+.brand::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.crumb {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection {
+  color: var(--color-success);
+  letter-spacing: .07em;
+  white-space: nowrap;
+}
+
+.connection i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.connection.degraded {
+  color: var(--color-danger);
+}
+
+.workspace {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-sidebar);
+}
+
+.side-title {
+  min-height: 31px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 12px 8px;
+  color: var(--text-muted);
+  font: 600 9px/1.2 var(--font-mono);
+  letter-spacing: .11em;
+}
+
+.side-title span {
+  color: var(--text-muted);
+}
+
+.project-list {
+  overflow: auto;
+  padding: 0 6px;
+}
+
+.project-item {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  gap: 7px;
+  padding: 7px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.project-item:hover,
+.project-item.selected {
+  background: var(--surface-panel-hover);
+  color: var(--text-strong);
+}
+
+.project-item.selected {
+  border-left-color: var(--color-accent);
+}
+
+.project-item .cursor {
+  width: 9px;
+  color: var(--color-accent);
+  font: 16px/16px var(--font-mono);
+}
+
+.project-item strong,
+.project-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-item strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.project-item small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font: 9px/1.3 var(--font-mono);
+}
+
+.new-project {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 9px 12px;
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-default);
+  background: none;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 10px;
+}
+
+.new-project:hover {
+  color: var(--text-strong);
+}
+
+.new-project span {
+  font-size: 15px;
+}
+
+.new-project kbd {
+  margin-left: auto;
+}
+
+.sidebar-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border-default);
+  color: var(--text-faint);
+  font: 9px/1.2 var(--font-mono);
+}
+
+.main-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.pane-head {
+  min-height: 80px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px var(--content-gutter);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.eyebrow {
+  color: var(--text-muted);
+  font: 600 9px/1.2 var(--font-mono);
+  letter-spacing: .11em;
+}
+
+.pane-head h1 {
+  margin: 5px 0 3px;
+  color: var(--text-strong);
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+.pane-head code {
+  color: var(--text-muted);
+  font: 10px/1.3 var(--font-mono);
+}
+
+.refresh {
+  align-self: flex-start;
+  padding: 5px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.refresh:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-panel-hover);
+  color: var(--text-strong);
+}
+
+.refresh kbd {
+  margin-left: 4px;
+}
+
+@media (max-width: 1180px) {
+  .forge-product-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(250px, 36vh);
+  }
+
+  .forge-product-shell:has(.main-thread-panel.collapsed) {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) 36px;
+  }
+
+  .forge-product-shell > .forge-tui {
+    height: auto;
+  }
+
+  .forge-thread-rail {
+    border-left: 0;
+    border-top: 1px solid var(--border-default);
+  }
+
+  .forge-thread-resizer {
+    display: none;
+  }
+
+  .side-title {
+    padding-top: 10px;
+  }
+
+  .pane-head {
+    min-height: 0;
+    padding-top: 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .forge-product-shell {
+    height: auto;
+    min-height: 100vh;
+    display: block;
+    overflow: visible;
+  }
+
+  .forge-product-shell > .forge-tui {
+    min-height: 680px;
+  }
+
+  .forge-thread-rail {
+    height: 430px;
+    border-top: 1px solid var(--border-default);
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    max-height: 155px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .sidebar-foot,
+  .crumb {
+    display: none;
+  }
+
+  .pane-head {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
