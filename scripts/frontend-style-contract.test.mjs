@@ -56,6 +56,11 @@ async function walk(directory) {
   return files
 }
 
+function exactCustomPropertyPattern(name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`${escaped}(?![\\w-])`)
+}
+
 test('frontend uses one canonical stylesheet tree', async () => {
   const rootEntries = await readdir(srcDir, { withFileTypes: true })
   const rootCss = rootEntries
@@ -96,7 +101,7 @@ test('retired compatibility token aliases do not return', async () => {
   for (const name of ['index.css', ...canonicalStyles]) {
     const source = await readFile(join(stylesDir, name), 'utf8')
     for (const alias of retiredAliases) {
-      assert.equal(source.includes(alias), false, `${name} must not use retired token alias ${alias}`)
+      assert.equal(exactCustomPropertyPattern(alias).test(source), false, `${name} must not use retired token alias ${alias}`)
     }
   }
 })
