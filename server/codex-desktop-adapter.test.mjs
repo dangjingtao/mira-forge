@@ -21,8 +21,12 @@ class FakeAppServer extends EventEmitter {
     this.capture = capture
     this.threadId = threadId
     this.buffer = ''
+    this.turnCount = 0
     this.stdin.on('data', (chunk) => this.consume(chunk.toString()))
-    this.stdin.on('end', () => queueMicrotask(() => this.emit('close', 0, null)))
+    this.stdin.on('end', () => queueMicrotask(() => {
+      this.capture.closed = (this.capture.closed || 0) + 1
+      this.emit('close', 0, null)
+    }))
   }
 
   write(message) {
@@ -44,47 +48,54 @@ class FakeAppServer extends EventEmitter {
       } else if (message.method === 'thread/start') {
         this.write({ id: message.id, result: { thread: { id: this.threadId } } })
       } else if (message.method === 'thread/resume') {
-        this.write({ id: message.id, result: { thread: { id: message.params.threadId } } })
+        if (this.capture.resumeError) {
+          this.write({ id: message.id, error: { code: -32600, message: this.capture.resumeError } })
+        } else {
+          this.threadId = message.params.threadId
+          this.write({ id: message.id, result: { thread: { id: message.params.threadId } } })
+        }
       } else if (message.method === 'turn/start') {
-        this.write({ id: message.id, result: { turn: { id: 'turn-1', status: 'inProgress', items: [], error: null } } })
+        this.turnCount += 1
+        const turnId = `turn-${this.turnCount}`
+        this.write({ id: message.id, result: { turn: { id: turnId, status: 'inProgress', items: [], error: null } } })
         queueMicrotask(() => {
           this.write({
             method: 'item/started',
             params: {
               threadId: this.threadId,
-              turnId: 'turn-1',
-              item: { id: 'cmd-1', type: 'commandExecution', status: 'inProgress' },
+              turnId,
+              item: { id: `cmd-${this.turnCount}`, type: 'commandExecution', status: 'inProgress' },
             },
           })
           this.write({
             method: 'item/completed',
             params: {
               threadId: this.threadId,
-              turnId: 'turn-1',
-              item: { id: 'cmd-1', type: 'commandExecution', status: 'completed' },
+              turnId,
+              item: { id: `cmd-${this.turnCount}`, type: 'commandExecution', status: 'completed' },
             },
           })
           this.write({
             method: 'item/completed',
             params: {
               threadId: this.threadId,
-              turnId: 'turn-1',
-              item: { id: 'reason-1', type: 'reasoning', summary: [{ text: 'checked the repository ledger' }] },
+              turnId,
+              item: { id: `reason-${this.turnCount}`, type: 'reasoning', summary: [{ text: 'checked the repository ledger' }] },
             },
           })
           this.write({
             method: 'item/completed',
             params: {
               threadId: this.threadId,
-              turnId: 'turn-1',
-              item: { id: 'answer-1', type: 'agentMessage', text: 'T012 — TUI dispatch wiring' },
+              turnId,
+              item: { id: `answer-${this.turnCount}`, type: 'agentMessage', text: 'T012 — TUI dispatch wiring' },
             },
           })
           this.write({
             method: 'turn/completed',
             params: {
               threadId: this.threadId,
-              turn: { id: 'turn-1', status: 'completed', error: null },
+              turn: { id: turnId, status: 'completed', error: null },
             },
           })
         })
@@ -208,9 +219,11 @@ test('Codex Desktop adapter speaks app-server JSONL and returns a durable thread
   assert.equal(threadStart.params.sandbox, 'read-only')
   const turnStart = capture.messages.find((message) => message.method === 'turn/start')
   assert.deepEqual(turnStart.params.sandboxPolicy, { type: 'readOnly' })
+  await adapter.dispose()
+  assert.equal(capture.closed, 1)
 })
 
-test('Codex Desktop adapter resumes the exact prior app-server thread', async () => {
+test('Codex Desktop adapter resumes the exact prior app-server thread after Forge does not own it', async () => {
   const capture = { calls: [], messages: [] }
   const adapter = createCodexDesktopMainThreadAdapter({
     spawnImpl: fakeSpawn(capture),
@@ -229,4 +242,52 @@ test('Codex Desktop adapter resumes the exact prior app-server thread', async ()
   assert.equal(resume.params.threadId, 'thr-desktop-1')
   assert.equal(resume.params.sandbox, 'read-only')
   assert.equal(capture.messages.some((message) => message.method === 'thread/start'), false)
+  await adapter.dispose()
+})
+
+test('Codex Desktop keeps one app-server writer for consecutive turns in the same Forge thread', async () => {
+  const capture = { calls: [], messages: [] }
+  const adapter = createCodexDesktopMainThreadAdapter({
+    spawnImpl: fakeSpawn(capture),
+    resolveBin: async () => '/Applications/ChatGPT.app/Contents/Resources/codex',
+    timeoutMs: 1000,
+  })
+
+  const first = await adapter.runTurn({ projectRoot: '/repo', message: 'first turn' })
+  const second = await adapter.runTurn({
+    projectRoot: '/repo',
+    message: 'second turn',
+    externalThreadId: first.externalThreadId,
+  })
+
+  assert.equal(second.externalThreadId, first.externalThreadId)
+  assert.equal(capture.calls.length, 1)
+  assert.equal(capture.messages.filter((message) => message.method === 'initialize').length, 1)
+  assert.equal(capture.messages.filter((message) => message.method === 'thread/start').length, 1)
+  assert.equal(capture.messages.filter((message) => message.method === 'thread/resume').length, 0)
+  assert.equal(capture.messages.filter((message) => message.method === 'turn/start').length, 2)
+
+  await adapter.dispose()
+  assert.equal(capture.closed, 1)
+})
+
+test('Codex Desktop reports an actionable conflict when an external writer owns a persisted thread', async () => {
+  const threadId = 'thr-busy-1'
+  const capture = {
+    calls: [],
+    messages: [],
+    resumeError: `thread ${threadId} already has an active writer`,
+  }
+  const adapter = createCodexDesktopMainThreadAdapter({
+    spawnImpl: fakeSpawn(capture),
+    resolveBin: async () => '/Applications/ChatGPT.app/Contents/Resources/codex',
+    timeoutMs: 1000,
+  })
+
+  await assert.rejects(
+    () => adapter.runTurn({ projectRoot: '/repo', message: 'continue', externalThreadId: threadId }),
+    /owned by another app-server writer.*open a new Forge Main Thread/i,
+  )
+  assert.equal(capture.closed, 1)
+  await adapter.dispose()
 })
