@@ -20,6 +20,7 @@
   --color-warning: #d3a05a;
   --color-success: #7fb96e;
   --color-danger: #d87771;
+  --color-danger-soft: rgba(216, 119, 113, 0.05);
 
   /* Surfaces */
   --surface-canvas: #0b0a09;
