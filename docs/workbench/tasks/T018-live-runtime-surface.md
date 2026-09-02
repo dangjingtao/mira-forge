@@ -15,6 +15,7 @@ The human-facing control loop must also close: when a Builder child task finishe
 - `AGENTS.md`
 - `docs/architecture.md`
 - `docs/tui-interaction.md`
+- `docs/frontend-style-contract.md`
 - `docs/workbench/tasks/T016-builder-thread-adapters.md`
 - `docs/workbench/tasks/T017-compact-mira-web-ui.md`
 - `server/dispatch-domain.mjs`
@@ -22,6 +23,8 @@ The human-facing control loop must also close: when a Builder child task finishe
 - `server/main-thread-manager.mjs`
 - `src/App.tsx`
 - `src/MainThreadPanel.tsx`
+- `src/workbench/RuntimePane.tsx`
+- `src/workbench/live-runtime-model.js`
 
 ## Verified Context
 
@@ -34,6 +37,20 @@ The human-facing control loop must also close: when a Builder child task finishe
 - Manual Builder dispatch and Main Thread conversation are separate execution contexts. Their results may be correlated by authoritative project/batch/task/dispatch/session identity, but Forge must not merge or infer conversation context merely because the same provider is used.
 - Visible product UI is English-only.
 
+## UI Focus Correction
+
+Human visual review after the first live-runtime implementation found that the default workbench exposed too many durable layers simultaneously: Main Thread runtime rows, Builder runtime rows, Batch/Task state and Event Log were all permanently visible even when they represented the same underlying task/session relationship. The result was information-rich but relationship-poor and worked against the focused TUI interaction model established in T017.
+
+The corrected hierarchy is:
+
+- primary workbench = current project/task/batch context plus a truthful compact runtime summary;
+- runtime inspector modal = full Builder/Reviewer runtime inventory and Main Thread runtime inventory, grouped by execution role instead of mixed into one flat list;
+- selected runtime detail = session/result/error evidence for the focused runtime row;
+- event-log modal = raw bounded project event history, available on demand rather than permanently occupying the workbench;
+- Main Thread rail = actual conversation surface; runtime inventory may focus a related Main Thread but must not duplicate the whole Main Thread inventory on the default workbench.
+
+The primary runtime summary must retain active/attention counts so unresolved operational state is still visible even when detailed lists are moved behind an inspector. This is focus layering, not hiding runtime truth.
+
 ## Scope
 
 1. expose active main/Builder thread state and current task/provider in the primary control surface;
@@ -45,7 +62,9 @@ The human-facing control loop must also close: when a Builder child task finishe
 7. keep runtime information durable across refresh/restart where Forge already has persisted evidence;
 8. when a Builder dispatch reaches a terminal state, surface its durable final result into the related Main Thread as a readable child-task handoff bound to the authoritative project/batch/task/dispatch identity;
 9. make the handoff concise and human-oriented (task, provider, completion state, result/validation/risks when available) rather than replaying the full provider event stream;
-10. preserve the distinction between runtime truth and conversation text: Builder `resultText` may explain the outcome, but dispatch/session/task state remains authoritative for success/failure/review status.
+10. preserve the distinction between runtime truth and conversation text: Builder `resultText` may explain the outcome, but dispatch/session/task state remains authoritative for success/failure/review status;
+11. keep the default workbench focused by summarizing runtime attention in one keyboard-focusable row and move full runtime inventory/event history into explicit inspector/modal surfaces;
+12. show authoritative task/batch relation inside runtime inspection so a Builder runtime row is visibly tied to the same Task Card shown in the workbench rather than appearing as a duplicate unrelated object.
 
 Prefer existing polling/runtime contracts unless a measured need justifies a different transport. Do not add WebSocket/SSE complexity merely for animation.
 
@@ -59,6 +78,8 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 - Do not overwrite provider-specific thread detail if it can be represented as optional metadata.
 - Do not inject arbitrary Main Thread conversation history into a manually dispatched Builder. A Builder remains bound to its explicit dispatch/task context unless a later versioned contract says otherwise.
 - Do not duplicate the same terminal Builder result into Main Thread on every poll/refresh; handoff delivery must be durable/idempotent.
+- Do not remove active/attention truth from the primary surface merely because full runtime rows move into a modal.
+- Do not reintroduce task/fix CSS layers; runtime summary styles belong to canonical `workbench.css`, inspector/modal styles to canonical `overlays.css`.
 
 ## Execution Entry Points
 
@@ -72,6 +93,11 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 - compact UI components/styles introduced by T017
 - `src/App.tsx`
 - `src/MainThreadPanel.tsx`
+- `src/workbench/RuntimePane.tsx`
+- `src/workbench/RuntimeControl.tsx`
+- `src/workbench/RuntimeInspectorModal.tsx`
+- `src/workbench/RuntimeEventLogModal.tsx`
+- `src/workbench/live-runtime-model.js`
 
 ## Acceptance
 
@@ -86,6 +112,10 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 - The same completed dispatch is handed off at most once logically; refresh/restart may reconstruct the visible handoff but must not append duplicate child-result messages.
 - A manual Builder dispatch remains scoped to its selected Task Card and is not silently continued from unrelated Main Thread conversation context.
 - Error/attention states remain visible until a meaningful operator action or authoritative state change resolves them.
+- The default workbench no longer permanently stacks full runtime inventory plus Event Log above/below Batch state; it keeps a compact runtime summary with active/attention counts and opens detailed runtime/event data on demand.
+- Runtime Inspector groups Builder/Reviewer task runtime separately from Main Threads and exposes authoritative Batch/Task identity so corresponding objects are understandable without guessing.
+- Enter/click can open the focused runtime summary/rows, Escape closes the inspector/event modal, and the event-log shortcut is visible inside runtime inspection.
+- Main Thread rows selected from runtime inspection focus the actual Main Thread rail instead of creating another duplicate conversation surface.
 - Automated verification covers polling/update stability, core state-to-UI mapping, Builder-result handoff idempotency and task/dispatch correlation; one real dispatch is used only for final observational smoke.
 - `npm run check` remains green.
 
@@ -100,16 +130,17 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 - The next Main Thread user turn receives Builder result handoffs that arrived since the previous user turn as bounded Forge context. This makes the Main Thread model itself able to reason from the child result while explicitly treating dispatch/session/task state as authoritative and without injecting Builder conversation history. The same result is not re-injected on every later user turn.
 - `builder_result` events remain standalone in the Main Thread timeline even if they arrive while another Main Thread turn is running, so the child-task result is not hidden inside the turn's folded thinking/execution process.
 - Successful Builder completion still moves the task only to `reviewing`; the Main Thread result card displays dispatch state and task state separately and never promotes process success to Review PASS.
-- The workbench composes a dedicated `LiveRuntimeSurface` before the existing Batch/Event Log surfaces. It projects persisted Main Threads, Builder/Reviewer sessions, blocked dependency states and review-needed states without manufacturing progress.
-- Runtime rows expose provider/task/session status and only use authoritative `session.startedAt` for elapsed duration. A session that has not actually started does not manufacture elapsed execution time from `createdAt`.
-- Historical failed/review attempts stop counting as actionable attention after current task truth moves beyond the unresolved state; unresolved active/attention rows are not discarded by the passive 16-row history cap. The visible surface remains height-bounded by its scrolling container.
-- Builder rows linked to a Main Thread provide an explicit focus entry point, while row selection preserves the existing task selection path and can reveal durable session/result/error detail.
+- The workbench composes a dedicated live-runtime projection from persisted Main Threads, Builder/Reviewer sessions, blocked dependency states and review-needed states without manufacturing progress.
+- Runtime rows use authoritative `session.startedAt` for elapsed duration. A session that has not actually started does not manufacture elapsed execution time from `createdAt`.
+- Historical failed/review attempts stop counting as actionable attention after current task truth moves beyond the unresolved state; unresolved active/attention rows are not discarded by the passive history cap.
+- Builder runtime linked to a Main Thread provides an explicit focus entry point, while task-runtime selection preserves the existing task selection path and can reveal durable session/result/error detail.
 - Main Thread renders terminal Builder handoffs as readable result cards while preserving the original T015 reference-only handoff shape.
 - Existing two-second `/api/state` polling remains the runtime transport; no SSE/WebSocket, new permissions, auto-merge or conversation-context injection was introduced.
 - Automated regression coverage includes state-to-live-UI mapping, duration semantics, project isolation, result-handoff identity/idempotency, cross-project binding rejection, terminal completion correlation, restart interruption handoff, provider-context result delivery-once, late-result delivery, resolved attention, unresolved-attention retention and stable polling row identity.
 - PR `#24` final Verify run `33597035459` passed `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke`.
 - PR `#25` Verify run `33611537231` passed the same four gates, and merged-tree Verify run `33611610144` passed them again on `dev`.
-- Final acceptance remains intentionally in `REVIEW` until one real Builder dispatch is observed through the product UI/runtime and confirms the live row, truthful timing, terminal Main Thread result handoff and next-turn Main Thread continuation on the actual local provider path. This is the only remaining task-card acceptance item not reproducible by repository automation in the current execution environment.
+- 2026-09-02 human UI review requested a focus-layer correction: keep runtime attention visible on the workbench, move full runtime inventory and raw Event Log behind keyboard-accessible inspector/modal surfaces, group Builder/Reviewer runtime separately from Main Threads, and make authoritative Batch/Task relationships explicit. This correction is implemented on `task/T018-focused-runtime-modals` pending verification/merge.
+- Final acceptance remains intentionally in `REVIEW` until one real Builder dispatch is observed through the product UI/runtime and confirms the live summary/inspector, truthful timing, terminal Main Thread result handoff and next-turn Main Thread continuation on the actual local provider path.
 
 ## Out of Scope
 
@@ -125,4 +156,4 @@ None. If existing runtime events do not expose one required fact, add the smalle
 
 ## Handoff
 
-Build this on real runtime state, not mock visual behavior. Keep updates quiet, stable and information-dense. T016's human smoke established the missing product seam: Builder execution/result capture works, but the terminal child-task conclusion must now flow back into Main Thread without collapsing Main Thread and Builder contexts into one conversation.
+Build this on real runtime state, not mock visual behavior. Keep updates quiet, stable and information-dense. T016's human smoke established the missing product seam: Builder execution/result capture works, but the terminal child-task conclusion must now flow back into Main Thread without collapsing Main Thread and Builder contexts into one conversation. The primary TUI should stay focused: current work remains visible; secondary runtime inventory and raw events are recalled through explicit inspector surfaces rather than permanently occupying the workbench.
