@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { focusMainThread } from './main-thread-focus'
 import BatchModal from './workbench/BatchModal'
 import CancelDispatchModal from './workbench/CancelDispatchModal'
 import CommandPalette from './workbench/CommandPalette'
@@ -80,6 +81,13 @@ function App() {
   )
   const dispatches = state?.dispatches ?? []
   const events = state?.events ?? []
+  const sessions = state?.sessions ?? []
+  const reviews = state?.reviews ?? []
+  const threads = state?.threads ?? []
+  const projectThreads = useMemo(
+    () => selected ? threads.filter((thread) => thread.projectId === selected.id) : [],
+    [selected, threads],
+  )
   const builderChoices = meta?.builderChoices?.length ? meta.builderChoices : ['opencode', 'piagent', 'codex']
 
   useEffect(() => {
@@ -401,6 +409,7 @@ function App() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             builder: form.get('builder'),
+            sourceThreadId: form.get('sourceThreadId') || undefined,
             taskRef: form.get('taskRef'),
             model: form.get('model'),
             agent: form.get('agent'),
@@ -466,12 +475,16 @@ function App() {
           stats={stats}
           batches={batches}
           dispatches={dispatches}
+          sessions={sessions}
+          reviews={reviews}
+          threads={projectThreads}
           selectedTaskKey={selectedTaskKey}
           selectedEvents={selectedEvents}
           activeBuilderDispatch={activeBuilderDispatch}
           onRefresh={() => void load()}
           onNewBatch={() => void prepareBatch()}
           onSelectTask={setSelectedTaskKey}
+          onOpenMainThread={focusMainThread}
         />
       </div>
 
@@ -505,6 +518,7 @@ function App() {
         <DispatchModal
           draft={dispatchTask}
           builderChoices={builderChoices}
+          mainThreads={projectThreads}
           inputRef={taskRefInput}
           dispatching={dispatching}
           onSubmit={submitDispatch}
