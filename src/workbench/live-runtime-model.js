@@ -2,6 +2,10 @@ const ACTIVE_SESSION_STATUSES = new Set(['starting', 'running', 'waiting'])
 const ACTIVE_DISPATCH_STATUSES = new Set(['starting', 'running'])
 const FAILED_DISPATCH_STATUSES = new Set(['failed', 'cancelled', 'interrupted'])
 const ACTIVE_THREAD_STATUSES = new Set(['running'])
+const UNRESOLVED_BUILDER_TASK_STATUSES = new Set(['interrupted', 'stale'])
+const UNRESOLVED_REVIEW_TASK_STATUSES = new Set(['reviewing', 'fixing', 'interrupted', 'stale'])
+const REVIEW_ATTENTION_STATUSES = new Set(['failed', 'changes_requested', 'cancelled'])
+const PASSIVE_ROW_LIMIT = 16
 
 function timeValue(value) {
   const parsed = Date.parse(value || '')
@@ -91,8 +95,8 @@ export function buildLiveRuntimeRows({ projectId, batches, dispatches, sessions,
       ? ACTIVE_DISPATCH_STATUSES.has(status)
       : ACTIVE_SESSION_STATUSES.has(session.status)
     const attention = session.role === 'builder'
-      ? FAILED_DISPATCH_STATUSES.has(status) || binding.task.status === 'interrupted' || binding.task.status === 'stale'
-      : ['failed', 'changes_requested', 'cancelled'].includes(status)
+      ? FAILED_DISPATCH_STATUSES.has(status) && UNRESOLVED_BUILDER_TASK_STATUSES.has(binding.task.status)
+      : REVIEW_ATTENTION_STATUSES.has(status) && UNRESOLVED_REVIEW_TASK_STATUSES.has(binding.task.status)
 
     rows.push({
       id: `session:${session.id}`,
@@ -107,7 +111,7 @@ export function buildLiveRuntimeRows({ projectId, batches, dispatches, sessions,
       status,
       taskStatus: binding.task.status,
       externalSessionId: session.externalSessionId ?? dispatch?.externalSessionId ?? null,
-      startedAt: session.startedAt ?? session.createdAt,
+      startedAt: session.startedAt ?? null,
       endedAt: session.endedAt,
       updatedAt: dispatch?.updatedAt ?? review?.updatedAt ?? session.updatedAt,
       resultText: dispatch?.resultText ?? null,
@@ -194,5 +198,9 @@ export function buildLiveRuntimeRows({ projectId, batches, dispatches, sessions,
     return timeValue(right.updatedAt) - timeValue(left.updatedAt)
   })
 
-  return rows.slice(0, 16)
+  const actionable = rows.filter((row) => row.active || row.attention)
+  const passive = rows
+    .filter((row) => !row.active && !row.attention)
+    .slice(0, Math.max(0, PASSIVE_ROW_LIMIT - actionable.length))
+  return [...actionable, ...passive]
 }
