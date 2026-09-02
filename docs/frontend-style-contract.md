@@ -55,7 +55,7 @@ Structural chrome should use surface, text and border tokens instead of feature-
 
 A literal color is acceptable only for a deliberately one-off derived detail. Repeated literals must become tokens.
 
-Compatibility aliases (`--mira-accent`, `--line`, `--panel`, etc.) currently exist so older code can migrate safely. New CSS should use the canonical `--color-*`, `--surface-*`, `--text-*`, and `--border-*` names.
+The old compatibility aliases (`--mira-accent`, `--line`, `--panel`, `--mono`, etc.) are retired. Do not reintroduce them; use the canonical `--color-*`, `--surface-*`, `--text-*`, `--border-*`, and `--font-*` names. The automated style guard rejects retired aliases.
 
 ## 4. Visual hierarchy
 

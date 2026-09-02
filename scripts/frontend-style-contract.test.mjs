@@ -17,6 +17,32 @@ const canonicalStyles = [
   'overlays.css',
 ]
 
+const retiredAliases = [
+  '--mira-accent',
+  '--mira-accent-hover',
+  '--mira-accent-soft',
+  '--bg',
+  '--surface',
+  '--panel',
+  '--panel2',
+  '--line',
+  '--line-strong',
+  '--muted',
+  '--text',
+  '--bright',
+  '--green',
+  '--cyan',
+  '--blue',
+  '--violet',
+  '--yellow',
+  '--red',
+  '--user-accent',
+  '--user-accent-soft',
+  '--assistant-accent',
+  '--assistant-accent-soft',
+  '--mono',
+]
+
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const files = []
@@ -28,6 +54,11 @@ async function walk(directory) {
   }
 
   return files
+}
+
+function exactCustomPropertyPattern(name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`${escaped}(?![\\w-])`)
 }
 
 test('frontend uses one canonical stylesheet tree', async () => {
@@ -64,4 +95,13 @@ test('components do not introduce competing stylesheet imports', async () => {
   assert.deepEqual(cssImports, [
     { file: 'src/main.tsx', importPath: './styles/index.css' },
   ])
+})
+
+test('retired compatibility token aliases do not return', async () => {
+  for (const name of ['index.css', ...canonicalStyles]) {
+    const source = await readFile(join(stylesDir, name), 'utf8')
+    for (const alias of retiredAliases) {
+      assert.equal(exactCustomPropertyPattern(alias).test(source), false, `${name} must not use retired token alias ${alias}`)
+    }
+  }
 })

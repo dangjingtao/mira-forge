@@ -59,29 +59,4 @@
 
   /* Effects */
   --shadow-modal: 0 20px 64px rgba(0, 0, 0, 0.55);
-
-  /* Compatibility aliases while component code migrates. Do not introduce new uses. */
-  --mira-accent: var(--color-accent);
-  --mira-accent-hover: var(--color-accent-hover);
-  --mira-accent-soft: var(--color-accent-soft);
-  --bg: var(--surface-canvas);
-  --surface: var(--surface-raised);
-  --panel: var(--surface-panel);
-  --panel2: var(--surface-panel-hover);
-  --line: var(--border-default);
-  --line-strong: var(--border-strong);
-  --muted: var(--text-muted);
-  --text: var(--text-primary);
-  --bright: var(--text-strong);
-  --green: var(--color-success);
-  --cyan: var(--color-info);
-  --blue: var(--color-user);
-  --violet: var(--color-artifact);
-  --yellow: var(--color-warning);
-  --red: var(--color-danger);
-  --user-accent: var(--color-user);
-  --user-accent-soft: var(--color-user-soft);
-  --assistant-accent: var(--color-assistant);
-  --assistant-accent-soft: var(--color-assistant-soft);
-  --mono: var(--font-mono);
 }
