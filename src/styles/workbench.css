@@ -88,6 +88,268 @@
   margin-left: 4px;
 }
 
+.live-runtime {
+  margin: 0 var(--content-gutter) 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.live-runtime-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-sidebar);
+  color: var(--text-muted);
+  font: 9px/1.2 var(--font-mono);
+}
+
+.live-runtime-head strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: .1em;
+}
+
+.live-runtime-list {
+  max-height: min(330px, 38vh);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.live-runtime-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.live-runtime-item:last-child {
+  border-bottom: 0;
+}
+
+.live-runtime-item.selected,
+.live-runtime-item:hover {
+  background: var(--surface-panel-hover);
+}
+
+.live-runtime-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(120px, 1fr) 126px 164px;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  font: 9px/1.3 var(--font-mono);
+}
+
+.live-runtime-row:focus-visible,
+.live-runtime-thread-link:focus-visible,
+.live-runtime-detail-head button:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.live-runtime-kind {
+  color: var(--color-info);
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.live-runtime-item.tone-warning .live-runtime-kind {
+  color: var(--color-warning);
+}
+
+.live-runtime-item.tone-success .live-runtime-kind {
+  color: var(--color-success);
+}
+
+.live-runtime-item.tone-danger .live-runtime-kind {
+  color: var(--color-danger);
+}
+
+.live-runtime-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.live-runtime-copy strong,
+.live-runtime-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-runtime-copy strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.live-runtime-copy small {
+  color: var(--text-dim);
+}
+
+.live-runtime-time {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.live-runtime-states {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.runtime-state {
+  min-width: 0;
+  padding: 2px 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-state.state-running,
+.runtime-state.state-starting,
+.runtime-state.state-waiting,
+.runtime-state.state-reviewing,
+.runtime-state.state-review_needed,
+.runtime-state.state-building,
+.runtime-state.state-fixing {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.runtime-state.state-completed,
+.runtime-state.state-passed,
+.runtime-state.state-review_passed,
+.runtime-state.state-waiting_integration,
+.runtime-state.state-integrated {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.runtime-state.state-blocked,
+.runtime-state.state-failed,
+.runtime-state.state-cancelled,
+.runtime-state.state-interrupted,
+.runtime-state.state-error,
+.runtime-state.state-changes_requested,
+.runtime-state.state-stale {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.live-runtime-thread-link {
+  align-self: stretch;
+  min-width: 49px;
+  padding: 0 7px;
+  border: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--color-artifact);
+  font: 8px/1.2 var(--font-mono);
+  white-space: nowrap;
+}
+
+.live-runtime-thread-link:hover {
+  background: var(--surface-panel-hover);
+  color: var(--text-strong);
+}
+
+.live-runtime-detail {
+  padding: 8px 9px 9px;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-sidebar);
+  color: var(--text-muted);
+  font: 9px/1.45 var(--font-mono);
+}
+
+.live-runtime-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-runtime-detail-head strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+
+.live-runtime-detail-head button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: 13px/1 var(--font-mono);
+}
+
+.live-runtime-detail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 6px;
+}
+
+.live-runtime-detail-grid span {
+  min-width: 0;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.live-runtime-detail-grid b {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.live-runtime-detail-grid code {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-runtime-error,
+.live-runtime-detail-note {
+  margin: 7px 0 0;
+}
+
+.live-runtime-error {
+  color: var(--color-danger);
+}
+
+.live-runtime-result {
+  max-height: 140px;
+  margin: 7px 0 0;
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-code);
+  color: var(--text-primary);
+  font: 9px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .batch {
   margin: 0 var(--content-gutter) 10px;
   overflow: hidden;
@@ -354,6 +616,16 @@
   font-size: 9px;
 }
 
+@media (max-width: 980px) {
+  .live-runtime-row {
+    grid-template-columns: 42px minmax(110px, 1fr) 140px;
+  }
+
+  .live-runtime-time {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .stat-line,
   .stream-label,
@@ -364,7 +636,8 @@
   }
 
   .batch,
-  .event-log {
+  .event-log,
+  .live-runtime {
     margin-left: 14px;
     margin-right: 14px;
   }
@@ -379,6 +652,25 @@
     display: none;
   }
 
+  .live-runtime-row {
+    grid-template-columns: 40px minmax(0, 1fr) 104px;
+    padding-right: 7px;
+  }
+
+  .live-runtime-copy small {
+    display: none;
+  }
+
+  .live-runtime-states {
+    display: grid;
+    justify-items: end;
+  }
+
+  .live-runtime-thread-link {
+    min-width: 43px;
+    padding: 0 5px;
+  }
+
   .runtime-event {
     grid-template-columns: 54px 48px minmax(110px, 1fr);
   }
@@ -389,7 +681,8 @@
     padding-right: 14px;
   }
 
-  .event-log {
+  .event-log,
+  .live-runtime-list {
     max-height: 220px;
   }
 
