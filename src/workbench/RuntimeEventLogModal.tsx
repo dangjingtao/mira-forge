@@ -9,7 +9,18 @@ type RuntimeEventLogModalProps = {
 
 export default function RuntimeEventLogModal({ events, onClose, onBack }: RuntimeEventLogModalProps) {
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          onClose()
+        }
+      }}
+    >
       <section className="runtime-event-modal" role="dialog" aria-modal="true" aria-labelledby="runtime-event-title">
         <header className="runtime-inspector-head">
           <div>
