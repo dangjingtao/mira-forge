@@ -2,39 +2,64 @@
 
 Local AI Engineering Orchestrator.
 
-Mira Forge is an experimental global local control plane for coordinating coding agents, durable runtime state, SHA-bound review handoff, dispatch readiness, and lightweight progress visibility across multiple repositories.
+Mira Forge is a local control plane for coordinating real repository Task Cards, durable project conversations, coding-agent dispatch, runtime evidence and review handoff across multiple local projects.
 
-## Current status
+It is **not** a coding agent and **not** a replacement task-management system. OpenCode, PiAgent and Codex do the actual agent work; Forge coordinates and records the engineering control loop around them.
 
-Stable first wave on `main`:
+## Product guide
 
-- one local control service on `127.0.0.1:47831`;
-- durable runtime state under `~/.mira-forge/state.json`;
-- local project registry;
-- Batch / Task runtime API;
-- minimal global progress dashboard;
-- persistence and state-domain verification.
+For the human-facing explanation of what Forge is, how the pieces relate, and what is actually usable through T018, see:
 
-Second wave implemented and verified on `dev`:
+- [`docs/user-guide.zh-CN.md`](docs/user-guide.zh-CN.md) — 中文产品 / 使用说明
+- [`docs/architecture.md`](docs/architecture.md) — architecture and runtime boundaries
+- [`docs/workbench/00-work-ledger.md`](docs/workbench/00-work-ledger.md) — authoritative task ledger
 
-- provider-neutral Builder / Reviewer / Git adapter registry and heartbeat;
-- durable Builder / Reviewer session lifecycle;
-- durable SHA-bound review handoff history;
-- invalidation of stale review passes when task SHA changes;
-- dependency validation and read-only dispatch readiness;
-- active Builder-session dispatch gate.
+## Current `dev` status
 
-Third wave is merged into `dev` and is in V1 human acceptance:
+The product loop implemented through T018 is:
 
-- durable dispatch attempts and runtime events;
-- first local OpenCode Builder process adapter;
-- serial first-use Builder policy;
-- process success/failure/cancel/restart/shutdown supervision;
-- keyboard-first TUI task selection, explicit dispatch/cancel, Builder busy state, and runtime-event history;
-- one-step disposable OpenCode First-run Check;
-- no automatic review PASS, push, merge or deployment.
+```text
+Registered Project
+      ↓
+Main Thread
+(discuss / inspect / plan)
+      ↓
+Repository Task Card
+      ↓
+explicit Dispatch
+      ↓
+Builder
+(OpenCode / PiAgent / Codex)
+      ↓
+Runtime evidence
+      ↓
+reviewing
+      ↓
+Builder result handoff → related Main Thread
+```
 
-Repository verification passes through Verify #63. The remaining acceptance is one First-run Check using the user's actual local `opencode` installation, followed by observational acceptance of the first normal real-project TUI dispatch.
+### Accepted capabilities
+
+- one local control service with durable state under `~/.mira-forge/state.json`;
+- local project registry and repository-native Task Source;
+- Batch / Task runtime bindings without copying Task Card bodies into Forge state;
+- provider-neutral adapter/session/dispatch/review contracts;
+- SHA-bound review handoff and stale-review invalidation;
+- durable Main Threads for project discussion and dispatch decisions;
+- Main Thread adapters for OpenCode, Codex Desktop and Codex CLI;
+- Builder adapters for OpenCode, PiAgent and Codex;
+- explicit dispatch and cancellation with process supervision;
+- global serial first-use Builder safety across built-in providers;
+- successful Builder completion moves construction to `reviewing`, never directly to Review PASS;
+- compact keyboard-first Web/TUI surface with persistent Main Thread rail;
+- compact runtime summary plus Runtime Inspector and on-demand Event Log;
+- durable Builder terminal result handoff back to an explicitly related Main Thread.
+
+T015, T016 and T017 are `PASS`.
+
+T018 is currently `REVIEW`: implementation and automated verification are merged to `dev`; the remaining acceptance is one real Builder product-loop smoke confirming the live runtime summary/inspector, truthful timing, terminal Builder-result handoff and next-turn Main Thread continuation on the actual local provider path.
+
+Forge still does **not** automatically review, retry/fix, merge, deploy or run parallel unmanaged Builders.
 
 ## Run locally
 
@@ -65,7 +90,7 @@ Then open `http://127.0.0.1:47831`.
 npm run check
 ```
 
-Verification runs unit/domain tests, TypeScript checking, dashboard build, the control-plane smoke, dispatch-readiness smoke, and on the third-wave branch a fake-OpenCode process smoke.
+The repository verification contract includes tests, TypeScript checking, dashboard build and smoke coverage. Real provider credentials, model/network availability and final human observational acceptance remain machine-local facts where the relevant Task Card explicitly requires them.
 
 ## Runtime API
 
@@ -98,24 +123,25 @@ POST  /api/reviews/:reviewId/result
 GET   /api/dispatches
 POST  /api/dispatches/:dispatchId/cancel
 GET   /api/events
-```
 
-Example project registration:
-
-```bash
-curl -X POST http://127.0.0.1:47831/api/projects \
-  -H 'content-type: application/json' \
-  -d '{
-    "name": "Com Design Prototype",
-    "rootPath": "/Users/tomz/code/com-design-prototype",
-    "repository": "https://github.com/dangjingtao/com-design-prototype",
-    "integrationBranch": "dev"
-  }'
+GET   /api/threads
+POST  /api/threads
+GET   /api/threads/:threadId
+POST  /api/threads/:threadId/messages
+GET   /api/threads/:threadId/tasks
+POST  /api/threads/:threadId/tasks
+GET   /api/threads/:threadId/tasks/:taskId
+PATCH /api/threads/:threadId/tasks/:taskId
+POST  /api/threads/:threadId/handoffs
 ```
 
 ## Project truth vs runtime truth
 
-Managed repositories keep their own product/task truth, for example `TODO → DOING → REVIEW → PASS`.
+Managed repositories keep their own product/task truth, for example:
+
+```text
+TODO → DOING → REVIEW → PASS
+```
 
 Forge keeps runtime engineering facts such as:
 
@@ -131,15 +157,9 @@ review_passed
 integrated
 ```
 
-Adapters, sessions, review handoffs, dispatch attempts and runtime events are execution evidence, not a replacement requirement system. Review PASS is only actionable for the exact SHA that was handed to the reviewer. A successful Builder process exit only moves construction into the review stage; it cannot manufacture review PASS.
+The two state layers are deliberately different.
 
-See `docs/architecture.md` and `docs/workbench/00-work-ledger.md`.
-
-The dashboard interaction contract and keyboard event model are documented in `docs/tui-interaction.md`.
-
-The complete V1 acceptance snapshot is documented in `docs/v1-status.md`.
-
-New capability planning is tracked separately in `docs/v2-plan.md`; unfinished V1 acceptance is not moved there.
+Adapters, sessions, review handoffs, dispatch attempts and runtime events are execution evidence, not a replacement requirement system. A successful Builder process exit only moves construction into the review stage. Review PASS is actionable only when it is valid for the concrete reviewed SHA.
 
 ## Branches
 
