@@ -170,7 +170,9 @@ T017 also owns the cleanup required to keep the accepted visual direction mainta
 - Frontend maintainability cleanup merged to `dev` through PR `#18` at squash commit `e9f7cf52e002c98f497d466ae4192e2ed76b9dc2`: historical root/task/visual/component CSS layers were replaced by the canonical `src/styles/` ownership tree, semantic tokens were centralized, and `docs/frontend-style-contract.md` was bound from `AGENTS.md`.
 - PR `#18` Verify run `33582718853` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` on the implementation head. After squash merge, `dev` Verify run `33582823030` passed the same four gates on the merged final tree.
 - Follow-up PR `#19` removed the remaining reusable inline `ShortcutFeedback` style object, moved that surface into canonical `overlays.css`, and clarified transient-feedback ownership in the style contract. PR `#19` Verify run `33583025442` passed `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke` before merge at squash commit `4544f564dcfecf18969abfc958d2411c855c87a9`.
-- T017 remains `REVIEW` until the structurally cleaned UI is visually smoked in the browser.
+- Final self-audit PR `#20` added executable style-ownership guards, corrected a cross-owner responsive selector and centralized the repeated danger-soft surface token. PR `#20` Verify run `33585496811` passed 94 tests plus typecheck, build and smoke; merged to `dev` at `3606820a654826ea7cf1a746bbb089b48cc31faf`, whose merged-tree Verify `33585561206` also passed all gates.
+- Final compatibility-tail PR `#21` retired unused legacy token aliases, extended the guard to prevent their return, and removed repository-task-picker `!important` specificity hacks by scoping rules to their owning overlay. PR `#21` Verify run `33585914016` passed all gates before merge at `f8be2138354caa1aa5e2f553f3fd43f4556cab61`; merged-tree push Verify `33585951385` also passed test, typecheck, build and smoke.
+- T017 remains `REVIEW` until the final structurally cleaned UI is visually accepted in the browser.
 
 ## Out of Scope
 
@@ -192,4 +194,4 @@ Resolved: frontend style ownership is formalized before T018; future task-specif
 
 ## Handoff
 
-T017 UI implementation, runtime-burst hardening and frontend style-system cleanup are merged to `dev` with automated verification green. Repeat the short browser smoke including a real Builder dispatch. Verify color balance, human/assistant distinction, rail resizing/persistence, top-region rhythm, Event Log stability and active task-row readability. Keep T017 in `REVIEW` until that human visual acceptance is complete.
+T017 UI implementation, runtime-burst hardening and frontend style-system cleanup are merged to `dev` with automated verification green. The final self-audit found no remaining code-level blocker after PR `#20` and PR `#21`. Repeat the short browser smoke including a real Builder dispatch. Verify color balance, human/assistant distinction, rail resizing/persistence, top-region rhythm, Event Log stability and active task-row readability. Keep T017 in `REVIEW` until that human visual acceptance is complete.
