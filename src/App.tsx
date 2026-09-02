@@ -1,150 +1,24 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-type Project = {
-  id: string
-  name: string
-  rootPath: string
-  repository: string | null
-  integrationBranch: string
-  taskLedger?: string | null
-  taskDir?: string | null
-}
-
-type Task = {
-  id: string
-  title: string
-  status: string
-  builder: string | null
-  reviewRound: number
-}
-
-type Batch = {
-  id: string
-  projectId: string
-  name: string
-  status: string
-  tasks: Task[]
-}
-
-type Dispatch = {
-  id: string
-  projectId: string
-  batchId: string
-  taskId: string
-  adapterId: string
-  sessionId: string
-  status: string
-  externalSessionId: string | null
-  pid: number | null
-  error: string | null
-  resultText: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-type RuntimeEvent = {
-  id: string
-  type: string
-  projectId: string | null
-  batchId: string | null
-  taskId: string | null
-  dispatchId: string | null
-  sessionId: string | null
-  data: Record<string, unknown>
-  createdAt: string
-}
-
-type ForgeState = {
-  schemaVersion: number
-  projects: Project[]
-  batches: Batch[]
-  dispatches?: Dispatch[]
-  events?: RuntimeEvent[]
-}
-
-type ForgeMeta = {
-  builderChoices?: string[]
-}
-
-type RepositoryTask = {
-  id: string
-  title: string
-  status: string
-}
-
-type RepositoryTaskSource = {
-  kind: string
-  ledgerRef: string
-  taskDirRef: string
-  tasks: RepositoryTask[]
-}
-
-type ResolvedRepositoryTask = RepositoryTask & {
-  cardStatus: string
-  taskRef: string
-  ledgerRef: string
-  warnings: string[]
-}
-
-type SelectedTask = {
-  batch: Batch
-  task: Task
-}
-
-type DispatchDraft = SelectedTask & {
-  taskRef: string
-}
-
-type DispatchReadiness = {
-  ready: Array<{ taskId: string }>
-  blocked: Array<{ taskId: string; reasons: Array<{ code: string }> }>
-}
-
-const statusLabels: Record<string, string> = {
-  waiting: 'waiting',
-  building: 'building',
-  reviewing: 'reviewing',
-  fixing: 'fixing',
-  waiting_integration: 'waiting integration',
-  interrupted: 'interrupted',
-  stale: 'stale',
-  review_passed: 'review passed',
-  integrated: 'integrated',
-}
-
-const builderLabels: Record<string, string> = {
-  opencode: 'OpenCode',
-  piagent: 'PiAgent',
-  codex: 'Codex',
-}
-
-const activeDispatchStatuses = new Set(['starting', 'running'])
-
-function taskKey(batchId: string, taskId: string) {
-  return `${batchId}:${taskId}`
-}
-
-function parseErrorBody(body: unknown, fallback: string) {
-  if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') return body.message
-  return fallback
-}
-
-function formatTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--:--:--'
-  return date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-}
-
-function formatEventData(event: RuntimeEvent) {
-  const parts: string[] = []
-  const { data } = event
-  if (data.externalSessionId) parts.push(`session ${String(data.externalSessionId)}`)
-  if (data.pid !== undefined && data.pid !== null) parts.push(`pid ${String(data.pid)}`)
-  if (data.exitCode !== undefined && data.exitCode !== null) parts.push(`exit ${String(data.exitCode)}`)
-  if (data.reason) parts.push(String(data.reason))
-  if (data.message) parts.push(String(data.message))
-  return parts.join(' · ')
-}
+import BatchModal from './workbench/BatchModal'
+import CancelDispatchModal from './workbench/CancelDispatchModal'
+import CommandPalette from './workbench/CommandPalette'
+import DispatchModal from './workbench/DispatchModal'
+import ProjectSidebar from './workbench/ProjectSidebar'
+import RegisterProjectModal from './workbench/RegisterProjectModal'
+import RuntimePane from './workbench/RuntimePane'
+import TopBar from './workbench/TopBar'
+import type {
+  Batch,
+  Dispatch,
+  DispatchDraft,
+  DispatchReadiness,
+  ForgeMeta,
+  ForgeState,
+  RepositoryTaskSource,
+  ResolvedRepositoryTask,
+  SelectedTask,
+} from './workbench/model'
+import { activeDispatchStatuses, parseErrorBody, taskKey } from './workbench/model'
 
 function App() {
   const [state, setState] = useState<ForgeState | null>(null)
@@ -199,9 +73,10 @@ function App() {
 
   const projects = state?.projects ?? []
   const selected = projects[activeProject]
+  const allBatches = state?.batches ?? []
   const batches = useMemo(
-    () => selected ? (state?.batches.filter((batch) => batch.projectId === selected.id) ?? []) : [],
-    [selected, state?.batches],
+    () => selected ? allBatches.filter((batch) => batch.projectId === selected.id) : [],
+    [selected, allBatches],
   )
   const dispatches = state?.dispatches ?? []
   const events = state?.events ?? []
@@ -574,289 +449,94 @@ function App() {
 
   return (
     <main className="forge-tui">
-      <header className="topbar">
-        <span className="brand">MIRA FORGE</span>
-        <span className="crumb">/ control plane / {selected?.name ?? 'workspace'}</span>
-        <span className={`connection ${connectionError ? 'degraded' : ''}`}><i /> {connectionError ? 'LOCAL · DEGRADED' : 'LOCAL · LIVE'}</span>
-      </header>
+      <TopBar projectName={selected?.name} connectionError={connectionError} />
 
       <div className="workspace">
-        <aside className="sidebar" aria-label="project navigator">
-          <div className="side-title">WORKSPACES <span>{projects.length}</span></div>
-          <div className="project-list">
-            {projects.map((project, index) => (
-              <button
-                key={project.id}
-                className={`project-item ${index === activeProject ? 'selected' : ''}`}
-                onClick={() => setActiveProject(index)}
-              >
-                <span className="cursor">{index === activeProject ? '›' : ' '}</span>
-                <span>
-                  <strong>{project.name}</strong>
-                  <small>{project.integrationBranch} · {state?.batches.filter((batch) => batch.projectId === project.id).length ?? 0} batches</small>
-                </span>
-              </button>
-            ))}
-          </div>
-          <button className="new-project" onClick={() => setRegistering(true)}>
-            <span>+</span> new project <kbd>n</kbd>
-          </button>
-          <div className="sidebar-foot"><span>v0.1.0</span><span>state: ~/.mira-forge</span></div>
-        </aside>
-
-        <section className="main-pane">
-          <div className="pane-head">
-            <div>
-              <span className="eyebrow">PROJECT STATUS</span>
-              <h1>{selected?.name ?? 'empty workspace'}</h1>
-              <code>{selected?.rootPath ?? 'No project selected'}</code>
-            </div>
-            <button className="refresh" onClick={() => void load()} title="Refresh (r)">↻ <kbd>r</kbd></button>
-          </div>
-
-          {(actionError || connectionError) && <div className="error-line" aria-live="polite">! {actionError || `control service: ${connectionError}`}</div>}
-
-          {selected ? (
-            <>
-              <div className="stat-line">
-                <Stat label="tasks" value={stats.total} />
-                <Stat label="building" value={stats.active} />
-                <Stat label="reviewing" value={stats.reviewing} />
-                <Stat label="passed" value={stats.passed} />
-              </div>
-
-              <div className="stream-label">
-                <span className="stream-heading">RUNTIME STREAM</span>
-                <div className="stream-right">
-                  <span className="stream-meta">
-                    {activeBuilderDispatch
-                      ? `${activeBuilderDispatch.adapterId} busy · ${activeBuilderDispatch.taskId}`
-                      : `${selectedEvents.length} events · ${batches.length} batches`}
-                  </span>
-                  <button className="stream-action" type="button" onClick={() => void prepareBatch()}>
-                    + batch <kbd>b</kbd>
-                  </button>
-                </div>
-              </div>
-
-              {batches.length ? batches.map((batch) => (
-                <article className="batch" key={batch.id}>
-                  <div className="batch-head"><strong>{batch.name}</strong><span>{batch.status}</span></div>
-                  {batch.tasks.map((task) => {
-                    const key = taskKey(batch.id, task.id)
-                    const taskDispatch = dispatches.find(
-                      (dispatch) => dispatch.batchId === batch.id && dispatch.taskId === task.id && activeDispatchStatuses.has(dispatch.status),
-                    )
-                    return (
-                      <button
-                        type="button"
-                        className={`task task-button ${key === selectedTaskKey ? 'selected-task' : ''}`}
-                        key={task.id}
-                        aria-pressed={key === selectedTaskKey}
-                        onClick={() => setSelectedTaskKey(key)}
-                        onFocus={() => setSelectedTaskKey(key)}
-                      >
-                        <span className={`status-dot dot-${task.status}`} />
-                        <b>{task.id}</b>
-                        <span className="task-title">{task.title}</span>
-                        <span className="task-meta">
-                          {taskDispatch ? `${taskDispatch.adapterId} · ${taskDispatch.status}` : task.builder || 'unassigned'}
-                          {task.reviewRound ? ` · review #${task.reviewRound}` : ''}
-                        </span>
-                        <span className={`task-status status-${task.status}`}>{statusLabels[task.status] || task.status}</span>
-                      </button>
-                    )
-                  })}
-                </article>
-              )) : (
-                <div className="empty-stream">
-                  <span className="prompt">›</span>
-                  <div>
-                    <strong>no batches to dispatch</strong>
-                    <p>Create a Batch from repository Task Cards. Forge keeps the cards in the repository as the source of truth.</p>
-                    <button className="empty-action" type="button" onClick={() => void prepareBatch()}>
-                      create batch from repo tasks <kbd>b</kbd>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {selectedEvents.length > 0 && (
-                <div className="event-log" aria-label="runtime events">
-                  <div className="event-log-title">EVENT LOG <span>latest {Math.min(selectedEvents.length, 30)}</span></div>
-                  {[...selectedEvents].slice(-30).reverse().map((event) => (
-                    <div className={`runtime-event event-${event.type.split('.').at(-1)}`} key={event.id}>
-                      <time>{formatTime(event.createdAt)}</time>
-                      <span className="event-task">{event.taskId ?? '—'}</span>
-                      <strong>{event.type}</strong>
-                      <span className="event-detail">{formatEventData(event)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="empty-workspace">
-              <span className="prompt">›</span>
-              <div><strong>workspace is empty</strong><p>Press <kbd>n</kbd> to register a local project.</p></div>
-            </div>
-          )}
-
-          <footer className="keybar">
-            <span><kbd>j</kbd><kbd>k</kbd> navigate</span>
-            <span><kbd>tab</kbd> select task</span>
-            <span><kbd>b</kbd> new batch</span>
-            <span><kbd>d</kbd> dispatch</span>
-            <span><kbd>x</kbd> cancel</span>
-            <span><kbd>n</kbd> new project</span>
-            <span><kbd>/</kbd> commands</span>
-            <span><kbd>r</kbd> refresh</span>
-            <span><kbd>esc</kbd> close</span>
-          </footer>
-        </section>
+        <ProjectSidebar
+          projects={projects}
+          batches={allBatches}
+          activeProject={activeProject}
+          onSelectProject={setActiveProject}
+          onNewProject={() => setRegistering(true)}
+        />
+        <RuntimePane
+          selected={selected}
+          actionError={actionError}
+          connectionError={connectionError}
+          stats={stats}
+          batches={batches}
+          dispatches={dispatches}
+          selectedTaskKey={selectedTaskKey}
+          selectedEvents={selectedEvents}
+          activeBuilderDispatch={activeBuilderDispatch}
+          onRefresh={() => void load()}
+          onNewBatch={() => void prepareBatch()}
+          onSelectTask={setSelectedTaskKey}
+        />
       </div>
 
       {registering && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setRegistering(false) }}>
-          <form className="register-modal" onSubmit={register}>
-            <div className="modal-title">REGISTER PROJECT <kbd>esc</kbd></div>
-            <label>name<input ref={nameRef} name="name" placeholder="project name" required /></label>
-            <label>root path<input name="rootPath" placeholder="/absolute/path/to/project" required /></label>
-            <label>repository <span className="optional">optional</span><input name="repository" placeholder="https://github.com/..." /></label>
-            <label>integration branch<input name="integrationBranch" defaultValue="dev" /></label>
-            <div className="form-pair">
-              <label>task ledger <span className="optional">optional</span><input name="taskLedger" placeholder="docs/workbench/00-work-ledger.md" /></label>
-              <label>task directory <span className="optional">optional</span><input name="taskDir" placeholder="docs/workbench/tasks" /></label>
-            </div>
-            <button type="submit" disabled={saving}>{saving ? 'registering...' : 'register project  ↵'}</button>
-          </form>
-        </div>
+        <RegisterProjectModal
+          inputRef={nameRef}
+          saving={saving}
+          onSubmit={register}
+          onClose={() => setRegistering(false)}
+        />
       )}
 
       {batching && selected && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBatching(false) }}>
-          {batchLoading ? (
-            <div className="action-modal batch-modal">
-              <div className="modal-title">NEW BATCH <kbd>esc</kbd></div>
-              <p className="modal-loading">loading repository task source...</p>
-            </div>
-          ) : batchSource ? (
-            <form className="action-modal batch-modal" onSubmit={createBatchFromSource}>
-              <div className="modal-title">NEW BATCH <kbd>esc</kbd></div>
-              <div className="source-summary">
-                <strong>{batchSource.ledgerRef}</strong>
-                <span>{batchSource.tasks.length} repository tasks · {batchSelection.size} selected</span>
-              </div>
-              {batchSourceError && <div className="source-error" aria-live="polite">! {batchSourceError}</div>}
-              <label>batch name <span className="optional">optional</span><input name="name" placeholder="next construction batch" /></label>
-              <div className="repo-task-picker" role="group" aria-label="Repository tasks">
-                {batchSource.tasks.map((task) => {
-                  const alreadyInBatch = existingRuntimeTaskIds.has(task.id)
-                  return (
-                    <label className={`repo-task-option ${alreadyInBatch ? 'disabled' : ''}`} key={task.id}>
-                      <input
-                        type="checkbox"
-                        checked={batchSelection.has(task.id)}
-                        disabled={alreadyInBatch}
-                        onChange={() => toggleBatchTask(task.id)}
-                      />
-                      <code>{task.id}</code>
-                      <span className="repo-task-title">{task.title}</span>
-                      <span className="repo-task-state">{alreadyInBatch ? 'in batch' : task.status}</span>
-                    </label>
-                  )
-                })}
-              </div>
-              <p className="serial-note">Task Cards stay in the repository; Batch stores execution state only.</p>
-              <button type="submit" disabled={batchSaving || batchSelection.size === 0}>
-                {batchSaving ? 'creating...' : `create batch with ${batchSelection.size} task${batchSelection.size === 1 ? '' : 's'}  ↵`}
-              </button>
-            </form>
-          ) : (
-            <form className="action-modal batch-modal" onSubmit={configureTaskSource}>
-              <div className="modal-title">TASK SOURCE REQUIRED <kbd>esc</kbd></div>
-              <div className="source-error" aria-live="polite">! {batchSourceError || 'repository task source is not configured'}</div>
-              <p className="source-config-note">Configure repository-relative Markdown paths. Forge validates them before saving.</p>
-              <label>task ledger<input name="taskLedger" defaultValue={selected.taskLedger ?? ''} placeholder="docs/workbench/00-work-ledger.md" required /></label>
-              <label>task directory<input name="taskDir" defaultValue={selected.taskDir ?? ''} placeholder="docs/workbench/tasks" required /></label>
-              <button type="submit" disabled={sourceSaving}>{sourceSaving ? 'validating...' : 'save source & load tasks  ↵'}</button>
-            </form>
-          )}
-        </div>
+        <BatchModal
+          selected={selected}
+          loading={batchLoading}
+          source={batchSource}
+          sourceError={batchSourceError}
+          selection={batchSelection}
+          existingRuntimeTaskIds={existingRuntimeTaskIds}
+          batchSaving={batchSaving}
+          sourceSaving={sourceSaving}
+          onToggleTask={toggleBatchTask}
+          onCreateBatch={createBatchFromSource}
+          onConfigureSource={configureTaskSource}
+          onClose={() => setBatching(false)}
+        />
       )}
 
       {dispatchTask && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDispatchTask(null) }}>
-          <form className="action-modal" onSubmit={submitDispatch}>
-            <div className="modal-title">DISPATCH {dispatchTask.task.id} <kbd>esc</kbd></div>
-            <div className="action-summary">
-              <strong>{dispatchTask.task.title}</strong>
-              <span>repository task · serial Builder</span>
-            </div>
-            <label>
-              Builder
-              <select name="builder" defaultValue={builderChoices[0]} required>
-                {builderChoices.map((builder) => <option value={builder} key={builder}>{builderLabels[builder] ?? builder}</option>)}
-              </select>
-            </label>
-            <label>
-              task card ref
-              <input
-                ref={taskRefInput}
-                className="readonly-ref"
-                name="taskRef"
-                value={dispatchTask.taskRef}
-                readOnly
-                required
-              />
-            </label>
-            <label>model <span className="optional">optional</span><input name="model" placeholder="provider/model" /></label>
-            <label>agent <span className="optional">OpenCode only</span><input name="agent" placeholder="agent name" /></label>
-            <p className="serial-note">one active Builder dispatch at a time · no auto-push / merge / deploy</p>
-            <button type="submit" disabled={dispatching}>{dispatching ? 'dispatching...' : 'dispatch task  ↵'}</button>
-          </form>
-        </div>
+        <DispatchModal
+          draft={dispatchTask}
+          builderChoices={builderChoices}
+          inputRef={taskRefInput}
+          dispatching={dispatching}
+          onSubmit={submitDispatch}
+          onClose={() => setDispatchTask(null)}
+        />
       )}
 
       {cancelTarget && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCancelTarget(null) }}>
-          <form className="action-modal cancel-modal" onSubmit={submitCancel}>
-            <div className="modal-title">CANCEL {cancelTarget.taskId} <kbd>esc</kbd></div>
-            <div className="action-summary">
-              <strong>{cancelTarget.id}</strong>
-              <span>{cancelTarget.adapterId} · {cancelTarget.status}</span>
-            </div>
-            <p className="cancel-copy">This sends SIGTERM to the supervised Builder and leaves the task interrupted.</p>
-            <button type="submit" className="danger-action" disabled={cancelling}>
-              {cancelling ? 'cancelling...' : 'cancel dispatch  ↵'}
-            </button>
-          </form>
-        </div>
+        <CancelDispatchModal
+          target={cancelTarget}
+          cancelling={cancelling}
+          onSubmit={submitCancel}
+          onClose={() => setCancelTarget(null)}
+        />
       )}
 
       {palette && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPalette(false) }}>
-          <div className="command-palette">
-            <div className="modal-title">COMMANDS <kbd>esc</kbd></div>
-            <button onClick={() => { setRegistering(true); setPalette(false) }}><kbd>n</kbd><span>new project</span></button>
-            <button disabled={!selected} onClick={() => void prepareBatch()}><kbd>b</kbd><span>new batch from repository tasks</span></button>
-            <button onClick={() => { void load(); setPalette(false) }}><kbd>r</kbd><span>refresh state</span></button>
-            <button disabled={!selectedTask || Boolean(activeBuilderDispatch)} onClick={() => void prepareDispatch()}>
-              <kbd>d</kbd><span>{selectedTask ? `dispatch ${selectedTask.task.id}` : 'dispatch selected task'}</span>
-            </button>
-            <button disabled={!selectedActiveDispatch} onClick={prepareCancel}>
-              <kbd>x</kbd><span>{selectedActiveDispatch ? `cancel ${selectedActiveDispatch.taskId}` : 'cancel active dispatch'}</span>
-            </button>
-            <button onClick={() => setPalette(false)}><kbd>q</kbd><span>close overlay</span></button>
-          </div>
-        </div>
+        <CommandPalette
+          hasProject={Boolean(selected)}
+          selectedTask={selectedTask}
+          activeBuilderDispatch={activeBuilderDispatch}
+          selectedActiveDispatch={selectedActiveDispatch}
+          onNewProject={() => { setRegistering(true); setPalette(false) }}
+          onNewBatch={() => void prepareBatch()}
+          onRefresh={() => { void load(); setPalette(false) }}
+          onDispatch={() => void prepareDispatch()}
+          onCancelDispatch={prepareCancel}
+          onClose={() => setPalette(false)}
+        />
       )}
     </main>
   )
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return <span className="stat"><b>{value}</b> {label}</span>
 }
 
 export default App
