@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  appendBuilderResultHandoff,
   beginMainThreadTurn,
   completeMainThreadTurn,
   createMainThread,
@@ -74,6 +75,53 @@ test('main thread handoff stores references only and never dispatches', () => {
   })
   assert.equal('body' in event.handoff, false)
   assert.deepEqual(state.dispatches, [])
+})
+
+test('Builder result handoff is idempotent per dispatch and preserves authoritative identities', () => {
+  const state = stateWithProject()
+  const thread = createMainThread(state, { projectId: 'p1', adapter: 'opencode' })
+  const input = {
+    projectId: 'p1',
+    batchId: 'B-1',
+    taskId: 'T018',
+    taskRef: 'docs/tasks/T018.md',
+    dispatchId: 'D-1',
+    sessionId: 'S-1',
+    adapterId: 'codex-local',
+    dispatchStatus: 'completed',
+    sessionStatus: 'completed',
+    taskStatus: 'reviewing',
+    externalSessionId: 'codex-thread-1',
+    resultText: 'Implemented the live runtime surface. Validation passed.',
+    error: null,
+    startedAt: '2026-09-02T00:00:00.000Z',
+    endedAt: '2026-09-02T00:01:00.000Z',
+  }
+
+  const first = appendBuilderResultHandoff(state, thread.id, input)
+  const second = appendBuilderResultHandoff(state, thread.id, input)
+  const results = getMainThreadEvents(state, thread.id).filter((event) => event.handoff?.kind === 'builder_result')
+
+  assert.equal(first.id, second.id)
+  assert.equal(results.length, 1)
+  assert.deepEqual(results[0].handoff, {
+    kind: 'builder_result',
+    projectId: 'p1',
+    batchId: 'B-1',
+    taskId: 'T018',
+    taskRef: 'docs/tasks/T018.md',
+    dispatchId: 'D-1',
+    sessionId: 'S-1',
+    adapterId: 'codex-local',
+    dispatchStatus: 'completed',
+    sessionStatus: 'completed',
+    taskStatus: 'reviewing',
+    externalSessionId: 'codex-thread-1',
+    resultText: 'Implemented the live runtime surface. Validation passed.',
+    error: null,
+    startedAt: '2026-09-02T00:00:00.000Z',
+    endedAt: '2026-09-02T00:01:00.000Z',
+  })
 })
 
 test('running main threads reconcile to an explicit interrupted error after restart', () => {
