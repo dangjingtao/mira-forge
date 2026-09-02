@@ -1,6 +1,7 @@
 import BatchList from './BatchList'
+import LiveRuntimeSurface from './LiveRuntimeSurface'
 import RuntimeEventLog from './RuntimeEventLog'
-import type { Batch, Dispatch, Project, RuntimeEvent, WorkbenchStats } from './model'
+import type { Batch, Dispatch, MainThread, Project, Review, RuntimeEvent, Session, WorkbenchStats } from './model'
 
 type RuntimePaneProps = {
   selected?: Project
@@ -9,12 +10,16 @@ type RuntimePaneProps = {
   stats: WorkbenchStats
   batches: Batch[]
   dispatches: Dispatch[]
+  sessions: Session[]
+  reviews: Review[]
+  threads: MainThread[]
   selectedTaskKey: string | null
   selectedEvents: RuntimeEvent[]
   activeBuilderDispatch: Dispatch | null
   onRefresh: () => void
   onNewBatch: () => void
   onSelectTask: (key: string) => void
+  onOpenMainThread: (projectId: string, threadId: string) => void
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -28,12 +33,16 @@ export default function RuntimePane({
   stats,
   batches,
   dispatches,
+  sessions,
+  reviews,
+  threads,
   selectedTaskKey,
   selectedEvents,
   activeBuilderDispatch,
   onRefresh,
   onNewBatch,
   onSelectTask,
+  onOpenMainThread,
 }: RuntimePaneProps) {
   return (
     <section className="main-pane">
@@ -73,6 +82,16 @@ export default function RuntimePane({
             </div>
           </div>
 
+          <LiveRuntimeSurface
+            projectId={selected.id}
+            batches={batches}
+            dispatches={dispatches}
+            sessions={sessions}
+            reviews={reviews}
+            threads={threads}
+            onSelectTask={onSelectTask}
+            onOpenMainThread={onOpenMainThread}
+          />
           <BatchList
             batches={batches}
             dispatches={dispatches}

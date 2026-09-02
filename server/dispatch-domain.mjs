@@ -51,6 +51,7 @@ export function createDispatch(state, input) {
     taskId: requiredString(input.taskId, 'taskId'),
     adapterId: requiredString(input.adapterId, 'adapterId'),
     sessionId: requiredString(input.sessionId, 'sessionId'),
+    sourceThreadId: nullableString(input.sourceThreadId),
     status: 'starting',
     promptSource: input.promptSource === 'task_ref' ? 'task_ref' : 'inline',
     taskRef: nullableString(input.taskRef),

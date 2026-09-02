@@ -14,6 +14,8 @@ export type Task = {
   status: string
   builder: string | null
   reviewRound: number
+  dependsOn?: string[]
+  updatedAt?: string
 }
 
 export type Batch = {
@@ -22,6 +24,7 @@ export type Batch = {
   name: string
   status: string
   tasks: Task[]
+  updatedAt?: string
 }
 
 export type Dispatch = {
@@ -31,11 +34,53 @@ export type Dispatch = {
   taskId: string
   adapterId: string
   sessionId: string
+  sourceThreadId: string | null
   status: string
   externalSessionId: string | null
   pid: number | null
   error: string | null
   resultText: string | null
+  startedAt: string | null
+  endedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type Session = {
+  id: string
+  role: 'builder' | 'reviewer'
+  adapterId: string
+  projectId: string
+  batchId: string
+  taskId: string
+  status: string
+  externalSessionId: string | null
+  startedAt: string | null
+  endedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type Review = {
+  id: string
+  projectId: string
+  batchId: string
+  taskId: string
+  reviewerSessionId: string
+  round: number
+  status: string
+  updatedAt: string
+}
+
+export type MainThread = {
+  id: string
+  projectId: string
+  adapter: string
+  title: string
+  model: string | null
+  status: string
+  externalThreadId: string | null
+  lastError: string | null
   createdAt: string
   updatedAt: string
 }
@@ -58,6 +103,9 @@ export type ForgeState = {
   batches: Batch[]
   dispatches?: Dispatch[]
   events?: RuntimeEvent[]
+  sessions?: Session[]
+  reviews?: Review[]
+  threads?: MainThread[]
 }
 
 export type ForgeMeta = {

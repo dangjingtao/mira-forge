@@ -49,6 +49,36 @@ function requireProject(state, projectId) {
   return project
 }
 
+function normalizeHandoff(input) {
+  if (input?.kind === 'builder_result') {
+    return {
+      kind: 'builder_result',
+      projectId: requiredString(input.projectId, 'handoff.projectId'),
+      batchId: requiredString(input.batchId, 'handoff.batchId'),
+      taskId: requiredString(input.taskId, 'handoff.taskId'),
+      taskRef: optionalString(input.taskRef, 512),
+      dispatchId: requiredString(input.dispatchId, 'handoff.dispatchId'),
+      sessionId: requiredString(input.sessionId, 'handoff.sessionId'),
+      adapterId: requiredString(input.adapterId, 'handoff.adapterId'),
+      dispatchStatus: requiredString(input.dispatchStatus, 'handoff.dispatchStatus'),
+      sessionStatus: optionalString(input.sessionStatus, 80),
+      taskStatus: requiredString(input.taskStatus, 'handoff.taskStatus'),
+      externalSessionId: optionalString(input.externalSessionId, 512),
+      resultText: optionalString(input.resultText, 16_384),
+      error: optionalString(input.error, 4096),
+      startedAt: optionalString(input.startedAt, 80),
+      endedAt: optionalString(input.endedAt, 80),
+    }
+  }
+
+  return {
+    projectId: requiredString(input?.projectId, 'handoff.projectId'),
+    taskId: requiredString(input?.taskId, 'handoff.taskId'),
+    taskRef: requiredString(input?.taskRef, 'handoff.taskRef'),
+    preferredBuilder: requiredString(input?.preferredBuilder, 'handoff.preferredBuilder'),
+  }
+}
+
 export function findMainThread(state, threadId) {
   const id = requiredString(threadId, 'threadId')
   const thread = threads(state).find((item) => item.id === id)
@@ -116,12 +146,7 @@ export function appendMainThreadEvent(state, threadId, input) {
       kind: requiredString(input.artifact.kind, 'artifact.kind').slice(0, 80),
       ref: optionalString(input.artifact.ref, 512),
     } : null,
-    handoff: input?.handoff ? {
-      projectId: requiredString(input.handoff.projectId, 'handoff.projectId'),
-      taskId: requiredString(input.handoff.taskId, 'handoff.taskId'),
-      taskRef: requiredString(input.handoff.taskRef, 'handoff.taskRef'),
-      preferredBuilder: requiredString(input.handoff.preferredBuilder, 'handoff.preferredBuilder'),
-    } : null,
+    handoff: input?.handoff ? normalizeHandoff(input.handoff) : null,
     provider: input?.provider ? {
       adapter: optionalString(input.provider.adapter, 80),
       eventType: optionalString(input.provider.eventType, 120),
@@ -227,5 +252,26 @@ export function createMainThreadHandoff(state, threadId, input) {
     type: 'handoff',
     text: `dispatch handoff: ${input.taskId}`,
     handoff: input,
+  })
+}
+
+export function appendBuilderResultHandoff(state, threadId, input) {
+  const thread = findMainThread(state, threadId)
+  if (thread.projectId !== input?.projectId) throw new Error('Builder result project does not match thread project')
+  const dispatchId = requiredString(input?.dispatchId, 'dispatchId')
+  const existing = getMainThreadEvents(state, thread.id).find((event) =>
+    event.type === 'handoff'
+    && event.handoff?.kind === 'builder_result'
+    && event.handoff.dispatchId === dispatchId)
+  if (existing) return existing
+
+  return appendMainThreadEvent(state, thread.id, {
+    type: 'handoff',
+    text: `Builder ${input.dispatchStatus}: ${input.taskId}`,
+    handoff: {
+      ...input,
+      kind: 'builder_result',
+      dispatchId,
+    },
   })
 }

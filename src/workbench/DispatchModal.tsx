@@ -1,10 +1,11 @@
 import type { FormEventHandler, RefObject } from 'react'
-import type { DispatchDraft } from './model'
+import type { DispatchDraft, MainThread } from './model'
 import { builderLabels } from './model'
 
 type DispatchModalProps = {
   draft: DispatchDraft
   builderChoices: string[]
+  mainThreads: MainThread[]
   inputRef: RefObject<HTMLInputElement | null>
   dispatching: boolean
   onSubmit: FormEventHandler<HTMLFormElement>
@@ -14,6 +15,7 @@ type DispatchModalProps = {
 export default function DispatchModal({
   draft,
   builderChoices,
+  mainThreads,
   inputRef,
   dispatching,
   onSubmit,
@@ -34,6 +36,15 @@ export default function DispatchModal({
           </select>
         </label>
         <label>
+          Result handoff <span className="optional">optional · result only</span>
+          <select name="sourceThreadId" defaultValue="">
+            <option value="">Keep Builder independent</option>
+            {mainThreads.map((thread) => (
+              <option value={thread.id} key={thread.id}>{thread.adapter} · {thread.title}</option>
+            ))}
+          </select>
+        </label>
+        <label>
           task card ref
           <input
             ref={inputRef}
@@ -46,7 +57,7 @@ export default function DispatchModal({
         </label>
         <label>model <span className="optional">optional</span><input name="model" placeholder="provider/model" /></label>
         <label>agent <span className="optional">OpenCode only</span><input name="agent" placeholder="agent name" /></label>
-        <p className="serial-note">one active Builder dispatch at a time · no auto-push / merge / deploy</p>
+        <p className="serial-note">result handoff does not share Main Thread conversation context · one active Builder dispatch at a time</p>
         <button type="submit" disabled={dispatching}>{dispatching ? 'dispatching...' : 'dispatch task  ↵'}</button>
       </form>
     </div>

@@ -1,6 +1,6 @@
 # T018 — Live Runtime Surface
 
-Status: TODO
+Status: REVIEW
 
 Depends on: T016 PASS, T017 PASS.
 
@@ -88,6 +88,21 @@ Prefer existing polling/runtime contracts unless a measured need justifies a dif
 - Error/attention states remain visible until a meaningful operator action or authoritative state change resolves them.
 - Automated verification covers polling/update stability, core state-to-UI mapping, Builder-result handoff idempotency and task/dispatch correlation; one real dispatch is used only for final observational smoke.
 - `npm run check` remains green.
+
+## Delivery Evidence
+
+- Implementation is proposed in PR `#24` from `task/T018-live-runtime-surface` to `dev`.
+- Builder dispatches may explicitly bind a `sourceThreadId` only when the selected Main Thread belongs to the same project. Blank/default dispatch remains independent and receives no Main Thread conversation history.
+- Terminal Builder states (`completed`, `failed`, `cancelled`, restart/shutdown interruption) write one durable `builder_result` handoff to the explicitly related Main Thread with authoritative project/batch/task/dispatch/session identity, provider/session metadata, terminal task state, bounded `resultText` and error evidence where available.
+- Handoff append is idempotent by related Main Thread plus dispatch identity, so polling or restart reconstruction cannot append the same child result repeatedly.
+- Successful Builder completion still moves the task only to `reviewing`; the Main Thread result card displays dispatch state and task state separately and never promotes process success to Review PASS.
+- The workbench now composes a dedicated `LiveRuntimeSurface` before the existing Batch/Event Log surfaces. It projects persisted Main Threads, Builder/Reviewer sessions, blocked dependency states and review-needed states without manufacturing progress.
+- Runtime rows expose provider/task/session status and factual started/duration information. Builder rows linked to a Main Thread provide an explicit focus entry point, while row selection preserves the existing task selection path and can reveal durable session/result/error detail.
+- Main Thread renders terminal Builder handoffs as readable result cards while preserving the original T015 reference-only handoff shape.
+- Existing two-second `/api/state` polling remains the runtime transport; no SSE/WebSocket, new permissions, auto-merge or conversation-context injection was introduced.
+- Automated regression coverage includes state-to-live-UI mapping, duration semantics, project isolation, result-handoff identity/idempotency, cross-project binding rejection, terminal completion correlation and restart interruption handoff.
+- PR `#24` Verify job passed `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke` on implementation head `285de02128fb38d2e552fd192e34e64c309e951c` before the documentation-only evidence update.
+- Final acceptance remains intentionally in `REVIEW` until one real Builder dispatch is observed through the product UI/runtime and confirms the live row plus terminal Main Thread result handoff on the actual local provider path. This is the only remaining task-card acceptance item not reproducible by repository automation in the current execution environment.
 
 ## Out of Scope
 
