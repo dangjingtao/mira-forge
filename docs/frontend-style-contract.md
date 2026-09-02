@@ -68,6 +68,17 @@ Forge is a compact engineering workbench.
 - Runtime bursts must remain bounded; dynamic data may scroll inside its owned region instead of expanding the whole workbench.
 - Important runtime state must remain visible and must not be hidden behind decorative cards or unnecessary modal layers.
 
+### Focus layers
+
+The primary workbench is the operator's current-focus surface, not a dump of every durable runtime record.
+
+- Keep current project/task/batch state and actionable summary visible on the primary surface.
+- Secondary inspection data such as full runtime session lists, Main Thread runtime inventory, raw event history and verbose session/result detail should open in explicit keyboard-accessible inspector/modal surfaces.
+- A modal may reduce persistent visual noise only when the primary surface retains a truthful summary or attention signal. Do not move unresolved failures/attention completely out of sight.
+- Do not repeat one logical object in multiple always-visible regions without an explicit relationship. If task runtime and task state refer to the same task, the inspector must show that relation using authoritative batch/task identity.
+- Main Thread conversation remains a first-class rail; runtime inventory may link/focus it, but should not duplicate all Main Thread rows on the default workbench.
+- Prefer a shallow interaction path: summary → inspector → selected detail. Avoid nested decorative dialogs or navigation that makes operational state harder to recover.
+
 ## 5. Layout and responsive behavior
 
 Current shared breakpoints:
@@ -87,6 +98,8 @@ The Main Thread rail may resize only in desktop rail mode. Its width is local UI
 - Collapse/expand uses `− / +` for Main Thread.
 - Destructive actions use danger semantics; do not use Mira orange as a generic danger color.
 - Disabled states must remain recognizable without depending solely on color.
+- Inspector/modal entry points must be normal focusable controls so Enter activation works without mouse-only affordances.
+- Runtime inspector and event-log overlays must support Escape close; additional shortcuts must be shown where they are available.
 
 ## 7. Frontend code ownership
 
@@ -95,7 +108,8 @@ Avoid growing a second kind of override pile in TSX.
 - `main.tsx` owns application composition and shell-only UI preference behavior.
 - `App.tsx` owns control-plane state, polling, API actions and keyboard orchestration. It should compose view components instead of owning large product markup blocks.
 - `src/workbench/` owns control-plane view components and the small shared UI projection model used by those components.
-- `RuntimePane.tsx` is the runtime-area composition boundary; substantial runtime sub-surfaces such as batch/task lists and event streams should have their own component owners before T018 expands them.
+- `RuntimePane.tsx` is the runtime-area composition boundary; substantial runtime sub-surfaces such as batch/task lists, runtime inspection and event streams must have their own component owners instead of growing back into one monolithic pane.
+- Runtime projection (`live-runtime-model`) stays separate from presentation. Summary, inspector, selected-row detail and event-log modal should consume that projection rather than derive new runtime truth from display text.
 - Modal and command surfaces should remain explicit components rather than returning to conditional JSX blocks inside `App.tsx`.
 - `MainThreadPanel.tsx` owns durable conversation behavior, not global shell styling.
 - A new substantial UI surface should have one clear component owner and one clear stylesheet owner.
@@ -124,4 +138,5 @@ A frontend PR should be rejected or revised if it:
 - adds a new breakpoint without justification;
 - hides important runtime state to make the page look cleaner;
 - breaks keyboard focus or makes interaction rely on hover alone;
-- grows a large existing component for a separable stateful surface without explaining why extraction is worse.
+- grows a large existing component for a separable stateful surface without explaining why extraction is worse;
+- restores an always-visible wall of runtime/event data when a truthful compact summary plus inspector would preserve focus better.
