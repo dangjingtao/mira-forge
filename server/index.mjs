@@ -86,7 +86,7 @@ const openCodeAcceptance = createOpenCodeAcceptance({
   runner: openCodeRunner,
   timeoutMs: Number(process.env.MIRA_FORGE_ACCEPTANCE_TIMEOUT_MS || 120_000),
 })
-const mainThreadTimeoutMs = Number(process.env.MIRA_FORGE_MAIN_THREAD_TIMEOUT_MS || 300_000)
+const mainThreadTimeoutMs = Number(process.env.MIRA_FORGE_MAIN_THREAD_TIMEOUT_MS || 3_000_000)
 const mainThreadManager = createMainThreadManager({
   store,
   adapters: new Map([

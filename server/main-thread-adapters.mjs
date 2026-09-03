@@ -282,7 +282,7 @@ export function createOpenCodeMainThreadAdapter({
   prefixArgs = [],
   spawnImpl = spawn,
   environment = process.env,
-  timeoutMs = 300_000,
+  timeoutMs = 3_000_000,
 } = {}) {
   return {
     id: 'opencode',
@@ -359,7 +359,7 @@ export function createCodexMainThreadAdapter({
   prefixArgs = [],
   spawnImpl = spawn,
   environment = process.env,
-  timeoutMs = 300_000,
+  timeoutMs = 3_000_000,
 } = {}) {
   return {
     id: 'codex',

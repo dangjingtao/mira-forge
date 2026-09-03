@@ -73,6 +73,8 @@ Development uses two local ports:
 - control plane: `http://127.0.0.1:47831`
 - dashboard Vite dev server: normally `http://127.0.0.1:47832`
 
+Main-thread provider requests default to a 50-minute timeout (`3,000,000ms`). Override it with `MIRA_FORGE_MAIN_THREAD_TIMEOUT_MS` when needed. The First-run Check keeps its separate 2-minute timeout.
+
 The Vite server is only a development UI. Forge state belongs to the control plane, not to Vite.
 
 Build and run the single-service form:

@@ -380,7 +380,7 @@ export function createCodexDesktopMainThreadAdapter({
   prefixArgs = [],
   spawnImpl = spawn,
   environment = process.env,
-  timeoutMs = 300_000,
+  timeoutMs = 3_000_000,
   resolveBin = resolveCodexDesktopBinary,
 } = {}) {
   const owners = new Map()
