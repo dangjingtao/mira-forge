@@ -80,40 +80,134 @@ try {
   const healthAfterMalformedHost = await fetch(`${baseUrl}/api/health`)
   if (!healthAfterMalformedHost.ok) throw new Error('Malformed Host request took the control plane offline')
 
+  const builder = await json(await fetch(`${baseUrl}/api/adapters`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'smoke-builder', name: 'Smoke Builder', kind: 'builder', capabilities: ['code', 'terminal'] }),
+  }))
+  const reviewer = await json(await fetch(`${baseUrl}/api/adapters`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'smoke-reviewer', name: 'Smoke Reviewer', kind: 'reviewer', capabilities: ['review'] }),
+  }))
+  await json(await fetch(`${baseUrl}/api/adapters/${builder.id}/heartbeat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'available' }),
+  }))
+  await json(await fetch(`${baseUrl}/api/adapters/${reviewer.id}/heartbeat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'available' }),
+  }))
+
   const project = await json(await fetch(`${baseUrl}/api/projects`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      name: 'Smoke Project',
-      rootPath: tempDir,
-      integrationBranch: 'dev',
-    }),
+    body: JSON.stringify({ name: 'Smoke Project', rootPath: tempDir, integrationBranch: 'dev' }),
   }))
 
   const batch = await json(await fetch(`${baseUrl}/api/batches`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      projectId: project.id,
-      name: 'Smoke Batch',
-      tasks: [{ id: 'T001', title: 'Smoke task' }],
-    }),
+    body: JSON.stringify({ projectId: project.id, name: 'Smoke Batch', tasks: [{ id: 'T001', title: 'Smoke task' }] }),
   }))
 
-  const task = await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
-    method: 'PATCH',
+  const builderSession = await json(await fetch(`${baseUrl}/api/sessions`, {
+    method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      status: 'reviewing',
-      builder: 'smoke-builder',
-      currentSha: 'smoke-sha',
-      reviewRound: 1,
+      id: 'S-smoke-builder', role: 'builder', adapterId: builder.id, projectId: project.id, batchId: batch.id, taskId: 'T001',
     }),
   }))
-  if (task.status !== 'reviewing' || task.reviewRound !== 1) throw new Error('Task update did not persist')
+  await json(await fetch(`${baseUrl}/api/sessions/${builderSession.id}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'running' }),
+  }))
+
+  const builtTask = await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'building', builder: builder.id, currentSha: 'smoke-sha' }),
+  }))
+  if (builtTask.currentSha !== 'smoke-sha' || builtTask.builderSessionId !== builderSession.id) {
+    throw new Error('Builder task binding did not persist')
+  }
+  const completedBuilderSession = await json(await fetch(`${baseUrl}/api/sessions/${builderSession.id}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'completed' }),
+  }))
+  const originalEndedAt = completedBuilderSession.endedAt
+  await sleep(5)
+  const retriedCompletedBuilderSession = await json(await fetch(`${baseUrl}/api/sessions/${builderSession.id}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'completed' }),
+  }))
+  if (retriedCompletedBuilderSession.endedAt !== originalEndedAt) {
+    throw new Error('Idempotent terminal session retry changed endedAt')
+  }
+
+  const reviewerSession = await json(await fetch(`${baseUrl}/api/sessions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      id: 'S-smoke-reviewer', role: 'reviewer', adapterId: reviewer.id, projectId: project.id, batchId: batch.id, taskId: 'T001',
+    }),
+  }))
+  await json(await fetch(`${baseUrl}/api/sessions/${reviewerSession.id}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'running' }),
+  }))
+
+  const review = await json(await fetch(`${baseUrl}/api/reviews`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      projectId: project.id,
+      batchId: batch.id,
+      taskId: 'T001',
+      reviewerSessionId: reviewerSession.id,
+      sha: 'smoke-sha',
+    }),
+  }))
+  if (review.status !== 'requested' || review.requestedSha !== 'smoke-sha') throw new Error('Review handoff was not created')
+
+  const reviewResult = await json(await fetch(`${baseUrl}/api/reviews/${review.id}/result`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ result: 'passed', reviewedSha: 'smoke-sha' }),
+  }))
+  if (reviewResult.status !== 'passed' || reviewResult.actionable !== true) throw new Error('Review pass was not actionable')
 
   const state = await json(await fetch(`${baseUrl}/api/state`))
-  if (state.projects.length !== 1 || state.batches.length !== 1) throw new Error('State snapshot is incomplete')
+  const storedTask = state.batches[0].tasks[0]
+  if (
+    state.projects.length !== 1
+    || state.batches.length !== 1
+    || state.adapters.length !== 2
+    || state.sessions.length !== 2
+    || state.reviews.length !== 1
+  ) throw new Error('State snapshot is incomplete')
+  if (storedTask.status !== 'review_passed' || storedTask.reviewedSha !== 'smoke-sha') {
+    throw new Error('Valid review handoff did not update task review state')
+  }
+
+  await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'waiting_integration' }),
+  }))
+  const staleTask = await json(await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ currentSha: 'smoke-sha-2' }),
+  }))
+  if (staleTask.status !== 'stale' || staleTask.reviewedSha !== null) {
+    throw new Error('Changing SHA did not invalidate post-pass task state')
+  }
+  const stateAfterShaChange = await json(await fetch(`${baseUrl}/api/state`))
+  if (stateAfterShaChange.reviews[0].actionable !== false || !stateAfterShaChange.reviews[0].invalidatedAt) {
+    throw new Error('Changing SHA did not invalidate durable review evidence')
+  }
+
+  const forgedPass = await fetch(`${baseUrl}/api/batches/${batch.id}/tasks/T001`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'review_passed' }),
+  })
+  if (forgedPass.ok) throw new Error('Direct task PATCH forged review_passed')
 
   const dashboard = await fetch(`${baseUrl}/`)
   const html = await dashboard.text()

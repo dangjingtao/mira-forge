@@ -2,7 +2,39 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 export function createEmptyState() {
-  return { schemaVersion: 1, projects: [], batches: [] }
+  return {
+    schemaVersion: 1,
+    projects: [],
+    batches: [],
+    adapters: [],
+    sessions: [],
+    reviews: [],
+    dispatches: [],
+    events: [],
+    threads: [],
+    threadEvents: [],
+  }
+}
+
+function normalizeState(parsed) {
+  if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.projects) || !Array.isArray(parsed.batches)) {
+    throw new Error('Unsupported or invalid Mira Forge state file')
+  }
+  for (const field of ['adapters', 'sessions', 'reviews', 'dispatches', 'events', 'threads', 'threadEvents']) {
+    if (parsed[field] !== undefined && !Array.isArray(parsed[field])) {
+      throw new Error('Unsupported or invalid Mira Forge state file')
+    }
+  }
+  return {
+    ...parsed,
+    adapters: parsed.adapters ?? [],
+    sessions: parsed.sessions ?? [],
+    reviews: parsed.reviews ?? [],
+    dispatches: parsed.dispatches ?? [],
+    events: parsed.events ?? [],
+    threads: parsed.threads ?? [],
+    threadEvents: parsed.threadEvents ?? [],
+  }
 }
 
 export function createStore(filePath) {
@@ -11,11 +43,7 @@ export function createStore(filePath) {
   async function read() {
     try {
       const raw = await readFile(filePath, 'utf8')
-      const parsed = JSON.parse(raw)
-      if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.projects) || !Array.isArray(parsed.batches)) {
-        throw new Error('Unsupported or invalid Mira Forge state file')
-      }
-      return parsed
+      return normalizeState(JSON.parse(raw))
     } catch (error) {
       if (error?.code === 'ENOENT') return createEmptyState()
       throw error
