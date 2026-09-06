@@ -24,4 +24,5 @@ Mira Forge is a local engineering orchestrator, not a coding agent and not a pro
 - Prefer Node built-ins in the control plane until a dependency is justified.
 - Keep API contracts small and explicit.
 - Add tests for persistence and state transitions before expanding automation.
+- Frontend visual changes must follow `docs/frontend-style-contract.md`; do not add task-named/fix/override stylesheets or duplicate owned selectors to win by cascade order.
 - Do not claim PASS until verification evidence exists.

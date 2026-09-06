@@ -11,7 +11,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "smoke": "node scripts/smoke.mjs",
+    "smoke": "node scripts/smoke.mjs && node scripts/readiness-smoke.mjs && node scripts/dispatch-smoke.mjs",
     "check": "npm test && npm run typecheck && npm run build && npm run smoke"
   },
   "dependencies": {
