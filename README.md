@@ -1,4 +1,15 @@
-# Mira Forge
+# Mira Forge (Historical)
+
+> [!IMPORTANT]
+> This standalone repository is no longer the active Forge product source.
+>
+> Forge has moved into **UIChat Mira** as **淬行**:
+> - active repository: `dangjingtao/uichat-mira`
+> - server domain: `server/src/forge/**`
+> - desktop product surface: `desktop/src/features/forge/**`
+> - current contract and migration evidence: `docs/forge/**`
+>
+> Do not use this repository for active development, build, release, or runtime deployment. The standalone server, `:47831` control plane, package/build files, and instructions below are retained only as historical implementation evidence.
 
 Local AI Engineering Orchestrator.
 
